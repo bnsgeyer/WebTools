@@ -420,6 +420,7 @@ async function run_transfer_function_ID(parser) {
     console.log("time field pre slicing size: ", timeData.length)
 
     timeData = timeData.slice(ind1_i, ind2_i)
+    timeDatasec = timeData.map(value => value / 1000000);
     console.log("time field post slicing size: ", timeData.length)
 
     ///TODO/// multi-input configuration
@@ -475,6 +476,8 @@ async function run_transfer_function_ID(parser) {
     console.log("time data length: ", timeData.length)
     console.log("input data length", inputData.length)
     console.log("output data length", outputData.length)
+
+    simo_iden = new FreqIdenSIMO(timeDatasec,f_start, f_end, 20, false, undefined, inputData, outputData)
 
     await pyodide.globals.set("input_data", inputData)
     await pyodide.globals.set("output_data", outputData)
