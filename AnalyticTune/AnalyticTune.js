@@ -123,14 +123,6 @@ function reset() {
     }
 
     // Clear all plot data
-    for (let i = 0; i < TimeInputs.data.length; i++) {
-        TimeInputs.data[i].x = []
-        TimeInputs.data[i].y = []
-    }
-    for (let i = 0; i < TimeOutputs.data.length; i++) {
-        TimeOutputs.data[i].x = []
-        TimeOutputs.data[i].y = []
-    }
     for (let i = 0; i < fft_plot.data.length; i++) {
         fft_plot.data[i].x = []
         fft_plot.data[i].y = []
@@ -153,8 +145,6 @@ function reset() {
 
 // Setup plots with no data
 var flight_data = {}
-var TimeInputs = {}
-var TimeOutputs = {}
 var fft_plot = {}
 function setup_plots() {
 
@@ -241,48 +231,6 @@ function setup_plots() {
 
     })
 
-    // Time domain plot
-    const pid_inputs = ["Target","Actual","Error"]
-
-    TimeInputs.data = []
-    for (const item of pid_inputs) {
-        TimeInputs.data.push({ mode: "lines",
-                                name: item,
-                                meta: item,
-                                showlegend: true,
-                                hovertemplate: "<extra></extra>%{meta}<br>%{x:.2f} s<br>%{y:.2f}" })
-    }
-
-    TimeInputs.layout = { legend: {itemclick: false, itemdoubleclick: false }, 
-                                margin: { b: 50, l: 50, r: 50, t: 20 },
-                                xaxis: { title: {text: time_scale_label } },
-                                yaxis: { title: {text: "deg / s" } }}
-
-    var plot = document.getElementById("TimeInputs")
-    Plotly.purge(plot)
-    Plotly.newPlot(plot, TimeInputs.data, TimeInputs.layout, {displaylogo: false})
-
-
-    const pid_outputs = ["P","I","D","FF","Output"]
-    TimeOutputs.data = []
-    for (const item of pid_outputs) {
-        TimeOutputs.data.push({ mode: "lines",
-                                name: item,
-                                meta: item,
-                                showlegend: true,
-                                hovertemplate: "<extra></extra>%{meta}<br>%{x:.2f} s<br>%{y:.2f}" })
-    }
-
-    TimeOutputs.layout = { legend: {itemclick: false, itemdoubleclick: false }, 
-                                margin: { b: 50, l: 50, r: 50, t: 20 },
-                                xaxis: { title: {text: time_scale_label } },
-                                yaxis: { title: {text: "" } }}
-
-    plot = document.getElementById("TimeOutputs")
-    Plotly.purge(plot)
-    Plotly.newPlot(plot, TimeOutputs.data, TimeOutputs.layout, {displaylogo: false})
-
-
     amplitude_scale = get_amplitude_scale()
     frequency_scale = get_frequency_scale()
 
@@ -300,9 +248,10 @@ function setup_plots() {
     Plotly.purge(plot)
     Plotly.newPlot(plot, fft_plot.data, fft_plot.layout, {displaylogo: false});
 
-    link_plots()
-} 
+//    link_plots()
+}
 
+/*
 function link_plots() {
 
     // Clear listeners
@@ -325,6 +274,7 @@ function link_plots() {
                      ["FFTPlot", fft_plot]])
 
 }
+*/
 
 // Add data sets to FFT plot
 const plot_types = ["Target", "Actual", "Error", "P", "I", "D", "FF", "Output"]
@@ -337,8 +287,6 @@ function setup_FFT_data() {
     const PID = PID_log_messages[get_axis_index()]
 
     // Clear existing data
-    TimeInputs.layout.shapes = []
-    TimeOutputs.layout.shapes = []
     fft_plot.data = []
 
 
@@ -366,7 +314,7 @@ function setup_FFT_data() {
                 fft_plot.data[index].legendgrouptitle =  { text: "Test " + (i+1) }
             }
         }
-
+/*
         const color = plot_default_color(i)
 
         // Add rectangle for each param set to time domain plots
@@ -387,22 +335,14 @@ function setup_FFT_data() {
 
         TimeInputs.layout.shapes.push(Object.assign({}, rect))
         TimeOutputs.layout.shapes.push(Object.assign({}, rect))
-
+*/
     }
-
-    let plot = document.getElementById("TimeInputs")
-    Plotly.purge(plot)
-    Plotly.newPlot(plot, TimeInputs.data, TimeInputs.layout, {displaylogo: false})
-
-    plot = document.getElementById("TimeOutputs")
-    Plotly.purge(plot)
-    Plotly.newPlot(plot, TimeOutputs.data, TimeOutputs.layout, {displaylogo: false})
 
     plot = document.getElementById("FFTPlot")
     Plotly.purge(plot)
     Plotly.newPlot(plot, fft_plot.data, fft_plot.layout, {displaylogo: false});
 
-    link_plots()
+//    link_plots()
 
 }
 
@@ -697,88 +637,6 @@ function redraw() {
 
     const PID = PID_log_messages[get_axis_index()]
 
-    // Time domain plots
-    for (let i = 0; i < TimeInputs.data.length; i++) {
-        TimeInputs.data[i].x = []
-        TimeInputs.data[i].y = []
-    }
-    for (let i = 0; i < TimeOutputs.data.length; i++) {
-        TimeOutputs.data[i].x = []
-        TimeOutputs.data[i].y = []
-    }
-    for (const set of PID.sets) {
-        if (set == null) {
-            continue
-        }
-        for (let i = 0; i < set.length; i++) {
-            if (i > 0) {
-                // Push NaN to show gap in data
-                for (let j = 0; j < TimeInputs.data.length; j++) {
-                    TimeInputs.data[j].x.push(NaN)
-                    TimeInputs.data[j].y.push(NaN)
-                }
-                for (let j = 0; j < TimeOutputs.data.length; j++) {
-                    TimeOutputs.data[j].x.push(NaN)
-                    TimeOutputs.data[j].y.push(NaN)
-                }
-            }
-            // Same x axis for all
-            for (let j = 0; j < TimeInputs.data.length; j++) {
-                TimeInputs.data[j].x = TimeInputs.data[j].x.concat(set[i].time)
-            }
-            TimeInputs.data[0].y = TimeInputs.data[0].y.concat(set[i].Tar)
-            TimeInputs.data[1].y = TimeInputs.data[1].y.concat(set[i].Act)
-            if ("Err" in set[i]) {
-                TimeInputs.data[2].y = TimeInputs.data[2].y.concat(set[i].Err)
-            }
-
-            for (let j = 0; j < TimeOutputs.data.length; j++) {
-                TimeOutputs.data[j].x = TimeOutputs.data[j].x.concat(set[i].time)
-            }
-            if ("P" in set[i]) {
-                TimeOutputs.data[0].y = TimeOutputs.data[0].y.concat(set[i].P)
-            }
-            if ("I" in set[i]) {
-                TimeOutputs.data[1].y = TimeOutputs.data[1].y.concat(set[i].I)
-            }
-            if ("D" in set[i]) {
-                TimeOutputs.data[2].y = TimeOutputs.data[2].y.concat(set[i].D)
-            }
-            if ("FF" in set[i]) {
-                TimeOutputs.data[3].y = TimeOutputs.data[3].y.concat(set[i].FF)
-            }
-            TimeOutputs.data[4].y = TimeOutputs.data[4].y.concat(set[i].Out)
-        }
-    }
-
-    // Set X axis to selected time range
-    const time_range = [ parseFloat(document.getElementById("TimeStart").value), parseFloat(document.getElementById("TimeEnd").value) ]
-
-    TimeInputs.layout.xaxis.autorange = false
-    TimeInputs.layout.xaxis.range = time_range
-
-    TimeOutputs.layout.xaxis.autorange = false
-    TimeOutputs.layout.xaxis.range = time_range
-
-    // Rectangles to show param changes
-    if (PID.params.sets.length > 1) {
-        for (let i = 0; i < PID.params.sets.length; i++) {
-            const set_start = Math.max(time_range[0], PID.params.sets[i].start_time)
-            const set_end = Math.min(time_range[1], PID.params.sets[i].end_time)
-
-            TimeInputs.layout.shapes[i].x0 = set_start
-            TimeInputs.layout.shapes[i].x1 = set_end
-            TimeInputs.layout.shapes[i].visible = true
-
-            TimeOutputs.layout.shapes[i].x0 = set_start
-            TimeOutputs.layout.shapes[i].x1 = set_end
-            TimeOutputs.layout.shapes[i].visible = true
-        }
-    }
-
-    Plotly.redraw("TimeInputs")
-    Plotly.redraw("TimeOutputs")
-
     if (PID.sets.FFT == null) {
         return
     }
@@ -858,6 +716,7 @@ function redraw() {
 
 }
 
+/*
 // Redraw step response
 function redraw_step() {
     if ((PID_log_messages == null) || !PID_log_messages.have_data) {
@@ -1038,7 +897,7 @@ function redraw_step() {
     Plotly.redraw("step_plot")
 
 } 
-
+*/
 // Update lines that are shown in FFT plot
 function update_hidden(source) {
 
@@ -1092,32 +951,6 @@ function update_hidden(source) {
             const show_key = document.getElementById("PIDX_" + fft_keys[j]).checked
             fft_plot.data[get_FFT_data_index(set, j)].visible = check && show_key
         }
-
-        const set_index = set*2
-
-        // Set mean plot
-        step_plot.data[set_index+1].visible = check
-
-        // See how many mean lines are showing and hide plot of all
-        let visible_mean = 0
-        let visible_set
-        let j = 0
-        while (j < step_plot.data.length) {
-            step_plot.data[j].visible = false
-            if (step_plot.data[j+1].visible) {
-                visible_mean++
-                visible_set = j
-            }
-            j += 2
-        }
-
-        // If only one mean line is shown then show all estimates for the mean
-        if (visible_mean == 1) {
-            step_plot.data[visible_set].visible = true
-        }
-
-        Plotly.redraw("step_plot")
-
 
     } else {
         set_all_from_id(source.id, source.checked)
