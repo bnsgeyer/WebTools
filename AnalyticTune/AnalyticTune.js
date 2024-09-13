@@ -87,15 +87,6 @@ function run_batch_fft(data_set) {
                      average_sample_rate: 1/sample_time,
                      window_size: window_size,
                      correction: window_correction }
-
-//    const X = to_double_sided(data_set.FFT.Tar)
-//    const Y = to_double_sided(data_set.FFT.Act)
-
-//    const Xcon = complex_conj(X)
-//    const Pyx = complex_mul(Y, Xcon)
-//    var Pxx = complex_mul(X, Xcon)
-
-//    const H = complex_div(Pyx, Pxx)
      
 }
 
@@ -710,6 +701,50 @@ function redraw() {
             fft_plot.data[plot_index].visible = show_set && show_key
 
         }
+
+        var real_sum_in = (new Array(set.FFT.Tar[0][0].length)).fill(0)
+        var im_sum_in = (new Array(set.FFT.Tar[0][0].length)).fill(0)
+        var real_sum_out = (new Array(set.FFT.Act[0][0].length)).fill(0)
+        var im_sum_out = (new Array(set.FFT.Act[0][0].length)).fill(0)
+        var real_sum_inout = (new Array(set.FFT.Tar[0][0].length)).fill(0)
+        var im_sum_inout = (new Array(set.FFT.Tar[0][0].length)).fill(0)
+
+        for (let k=start_index;k<end_index;k++) {
+            // Add to sum
+            var input_sqr = complex_square(set.FFT.Tar[k])
+            var output_sqr = complex_square(set.FFT.Act[k])
+            var input_output = complex_mul(complex_conj(set.FFT.Tar[k]),set.FFT.Act[k])
+            real_sum_in = array_add(real_sum_in, input_sqr[0])
+            im_sum_in = array_add(im_sum_in, input_sqr[1])
+            real_sum_out = array_add(real_sum_out, output_sqr[0])
+            im_sum_out = array_add(im_sum_out, output_sqr[1])
+            real_sum_inout = array_add(real_sum_inout, input_output[0])
+            im_sum_inout = array_add(im_sum_inout, input_output[1])
+        }
+        var input_sqr_sum = [real_sum_in, im_sum_in]
+        var output_sqr_sum = [real_sum_out, im_sum_out]
+        var input_output_sum = [real_sum_inout, im_sum_inout]
+
+        const H = complex_div(input_output_sum, input_sqr_sum)
+
+        const coh_num = array_mul(complex_abs(input_output_sum),complex_abs(input_output_sum))
+        const coh_den = array_mul(complex_abs(input_sqr_sum), complex_abs(output_sqr_sum))
+        const coh = array_div(coh_num, coh_den)
+
+        const Hmag = complex_abs(H)
+
+        const Hphase = complex_phase(H)
+
+        // Find the plot index
+        var plot_index = get_FFT_data_index(i, 0)
+        // Apply selected scale, set to y axis
+        fft_plot.data[plot_index].y = amplitude_scale.scale(Hmag)
+        // Find the plot index
+        plot_index = get_FFT_data_index(i, 1)
+        // Apply selected scale, set to y axis
+        fft_plot.data[plot_index].y = array_scale(Hphase, 180 / Math.PI)
+//        fft_plot.data[plot_index].y = coh
+
     }
 
     Plotly.redraw("FFTPlot")
