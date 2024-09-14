@@ -117,6 +117,10 @@ function reset() {
     for (let i = 0; i < fft_plot.data.length; i++) {
         fft_plot.data[i].x = []
         fft_plot.data[i].y = []
+        fft_plot_Phase.data[i].x = []
+        fft_plot_Phase.data[i].y = []
+        fft_plot_Coh.data[i].x = []
+        fft_plot_Coh.data[i].y = []
     }
 
     document.getElementById("calculate").disabled = true
@@ -137,6 +141,8 @@ function reset() {
 // Setup plots with no data
 var flight_data = {}
 var fft_plot = {}
+var fft_plot_Phase = {}
+var fft_plot_Coh = {}
 function setup_plots() {
 
     const time_scale_label = "Time (s)"
@@ -227,6 +233,8 @@ function setup_plots() {
 
     // FFT plot setup
     fft_plot.data = []
+    fft_plot_Phase.data = []
+    fft_plot_Coh.data = []
     fft_plot.layout = {
         xaxis: {title: {text: frequency_scale.label }, type: "linear", zeroline: false, showline: true, mirror: true},
         yaxis: {title: {text: amplitude_scale.label }, zeroline: false, showline: true, mirror: true },
@@ -234,38 +242,55 @@ function setup_plots() {
         legend: {itemclick: false, itemdoubleclick: false },
         margin: { b: 50, l: 50, r: 50, t: 20 },
     }
+    fft_plot_Phase.layout = {
+        xaxis: {title: {text: frequency_scale.label }, type: "linear", zeroline: false, showline: true, mirror: true},
+        yaxis: {title: "Phase (degrees)", zeroline: false, showline: true, mirror: true },
+        showlegend: true,
+        legend: {itemclick: false, itemdoubleclick: false },
+        margin: { b: 50, l: 50, r: 50, t: 20 },
+    }
+    fft_plot_Coh.layout = {
+        xaxis: {title: {text: frequency_scale.label }, type: "linear", zeroline: false, showline: true, mirror: true},
+        yaxis: {title: "Coherence", zeroline: false, showline: true, mirror: true },
+        showlegend: true,
+        legend: {itemclick: false, itemdoubleclick: false },
+        margin: { b: 50, l: 50, r: 50, t: 20 },
+    }
 
-    plot = document.getElementById("FFTPlot")
+    plot = document.getElementById("FFTPlotMag")
     Plotly.purge(plot)
     Plotly.newPlot(plot, fft_plot.data, fft_plot.layout, {displaylogo: false});
 
-//    link_plots()
+    plot = document.getElementById("FFTPlotPhase")
+    Plotly.purge(plot)
+    Plotly.newPlot(plot, fft_plot_Phase.data, fft_plot_Phase.layout, {displaylogo: false});
+
+    plot = document.getElementById("FFTPlotCoh")
+    Plotly.purge(plot)
+    Plotly.newPlot(plot, fft_plot_Coh.data, fft_plot_Coh.layout, {displaylogo: false});
+
+    //link_plots()
 }
 
-/*
+
 function link_plots() {
 
     // Clear listeners
-    document.getElementById("TimeInputs").removeAllListeners("plotly_relayout");
-    document.getElementById("TimeOutputs").removeAllListeners("plotly_relayout");
-    document.getElementById("FFTPlot").removeAllListeners("plotly_relayout");
+    document.getElementById("FFTPlotMag").removeAllListeners("plotly_relayout");
+    document.getElementById("FFTPlotPhase").removeAllListeners("plotly_relayout");
+    document.getElementById("FFTPlotCoh").removeAllListeners("plotly_relayout");
 
     // Link all frequency axis
-//    link_plot_axis_range([["FFTPlot", "x", "", fft_plot],
-//                          ["Spectrogram", "y", "", Spectrogram]])
-
-    // Link time axis
-    link_plot_axis_range([["TimeInputs", "x", "", TimeInputs],
-                          ["TimeOutputs", "x", "", TimeOutputs]])
-
+    link_plot_axis_range([["FFTPlotMag", "x", "", fft_plot],
+                          ["FFTPlotPhase", "x", "", fft_plot_Phase],
+                          ["FFTPlotCoh", "x", "", fft_plot_Coh]])
 
     // Link all reset calls
-    link_plot_reset([["TimeInputs", TimeInputs],
-                     ["TimeOutputs", TimeOutputs],
-                     ["FFTPlot", fft_plot]])
+    link_plot_reset([["FFTPlotMag", fft_plot],
+                     ["FFTPlotPhase", fft_plot_Phase],
+                     ["FFTPlotCoh", fft_plot_Coh]])
 
 }
-*/
 
 // Add data sets to FFT plot
 const plot_types = ["Target", "Actual", "Error", "P", "I", "D", "FF", "Output"]
@@ -279,6 +304,8 @@ function setup_FFT_data() {
 
     // Clear existing data
     fft_plot.data = []
+    fft_plot_Phase.data = []
+    fft_plot_Coh.data = []
 
 
     // Add group for each param set
@@ -299,39 +326,39 @@ function setup_FFT_data() {
                                      meta: meta_prefix + plot_types[j],
                                      hovertemplate: "" }
 
+            fft_plot_Phase.data[index] = { mode: "lines",
+                                     name: plot_types[j],
+                                     meta: meta_prefix + plot_types[j],
+                                     hovertemplate: "" }
+
+            fft_plot_Coh.data[index] = { mode: "lines",
+                                     name: plot_types[j],
+                                     meta: meta_prefix + plot_types[j],
+                                     hovertemplate: "" }
+          
             // Add legend groups if multiple sets
             if (num_sets > 1) {
                 fft_plot.data[index].legendgroup = i
                 fft_plot.data[index].legendgrouptitle =  { text: "Test " + (i+1) }
-            }
+                fft_plot_Phase.data[index].legendgroup = i
+                fft_plot_Phase.data[index].legendgrouptitle =  { text: "Test " + (i+1) }
+                fft_plot_Coh.data[index].legendgroup = i
+                fft_plot_Coh.data[index].legendgrouptitle =  { text: "Test " + (i+1) }
+             }
         }
-/*
-        const color = plot_default_color(i)
-
-        // Add rectangle for each param set to time domain plots
-        const rect = {
-            type: 'rect',
-            line: { width: 0 },
-            yref: 'paper',
-            y0: 0,   y1: 1,
-            fillcolor: color,
-            opacity: 0.4,
-            label: {
-                text: i+1,
-                textposition: 'top left',
-            },
-            layer: "below",
-            visible: false
-        }
-
-        TimeInputs.layout.shapes.push(Object.assign({}, rect))
-        TimeOutputs.layout.shapes.push(Object.assign({}, rect))
-*/
     }
 
-    plot = document.getElementById("FFTPlot")
+    plot = document.getElementById("FFTPlotMag")
     Plotly.purge(plot)
     Plotly.newPlot(plot, fft_plot.data, fft_plot.layout, {displaylogo: false});
+
+    plot = document.getElementById("FFTPlotPhase")
+    Plotly.purge(plot)
+    Plotly.newPlot(plot, fft_plot_Phase.data, fft_plot_Phase.layout, {displaylogo: false});
+
+    plot = document.getElementById("FFTPlotCoh")
+    Plotly.purge(plot)
+    Plotly.newPlot(plot, fft_plot_Coh.data, fft_plot_Coh.layout, {displaylogo: false});
 
 //    link_plots()
 
@@ -645,9 +672,19 @@ function redraw() {
     fft_plot.layout.xaxis.title.text = frequency_scale.label
     fft_plot.layout.yaxis.title.text = amplitude_scale.label
 
+    fft_plot_Phase.layout.xaxis.type = frequency_scale.type
+    fft_plot_Phase.layout.xaxis.title.text = frequency_scale.label
+    fft_plot_Phase.layout.yaxis.title.text = amplitude_scale.label
+
+    fft_plot_Coh.layout.xaxis.type = frequency_scale.type
+    fft_plot_Coh.layout.xaxis.title.text = frequency_scale.label
+    fft_plot_Coh.layout.yaxis.title.text = amplitude_scale.label
+
     const fft_hovertemplate = "<extra></extra>%{meta}<br>" + frequency_scale.hover("x") + "<br>" + amplitude_scale.hover("y")
     for (let i = 0; i < fft_plot.data.length; i++) {
         fft_plot.data[i].hovertemplate = fft_hovertemplate
+        fft_plot_Phase.data[i].hovertemplate = fft_hovertemplate
+        fft_plot_Coh.data[i].hovertemplate = fft_hovertemplate
     }
 
     // Windowing amplitude correction depends on spectrum of interest and resolution
@@ -672,40 +709,8 @@ function redraw() {
         // Number of windows averaged
         const mean_length = end_index - start_index
 
-        for (let j = 0; j < fft_keys.length; j++) {
-            const key = fft_keys[j]
-            if (!(key in set.FFT) || (set.FFT[key][0] == null)) {
-                continue
-            }
-
-            var mean = (new Array(set.FFT[key][0][0].length)).fill(0)
-            for (let k=start_index;k<end_index;k++) {
-                // Add to mean sum
-                mean = array_add(mean, amplitude_scale.fun(complex_abs(set.FFT[key][k])))
-            }
-
-            // Apply window correction and divide by length to take mean
-            const corrected = array_scale(mean, window_correction / mean_length)
-
-            // Find the plot index
-            const plot_index = get_FFT_data_index(i, j)
-
-            // Apply selected scale, set to y axis
-            fft_plot.data[plot_index].y = amplitude_scale.scale(corrected)
-
-            // Set bins
-            fft_plot.data[plot_index].x = scaled_bins
-
-            // Work out if we should show this line
-            const show_key = document.getElementById("PIDX_" + key).checked
-            fft_plot.data[plot_index].visible = show_set && show_key
-
-        }
-
         var sum_in = array_mul(complex_abs(set.FFT.Tar[start_index]),complex_abs(set.FFT.Tar[start_index]))
-//        var im_sum_in = (new Array(set.FFT.Tar[0][0].length)).fill(0)
         var sum_out = array_mul(complex_abs(set.FFT.Act[start_index]),complex_abs(set.FFT.Act[start_index]))
-//        var im_sum_out = (new Array(set.FFT.Act[0][0].length)).fill(0)
         var input_output = complex_mul(complex_conj(set.FFT.Tar[start_index]),set.FFT.Act[start_index])
         var real_sum_inout = input_output[0]
         var im_sum_inout = input_output[1]
@@ -716,9 +721,7 @@ function redraw() {
             var output_sqr = array_mul(complex_abs(set.FFT.Act[k]),complex_abs(set.FFT.Act[k]))
             input_output = complex_mul(complex_conj(set.FFT.Tar[k]),set.FFT.Act[k])
             sum_in = array_add(sum_in, input_sqr)  // this is now a scalar
-         //   im_sum_in = array_add(im_sum_in, input_sqr[1])
             sum_out = array_add(sum_out, output_sqr) // this is now a scalar
-         //   im_sum_out = array_add(im_sum_out, output_sqr[1])
             real_sum_inout = array_add(real_sum_inout, input_output[0])
             im_sum_inout = array_add(im_sum_inout, input_output[1])
         }
@@ -742,202 +745,43 @@ function redraw() {
 
         // Find the plot index
         var plot_index = get_FFT_data_index(i, 0)
+
         // Apply selected scale, set to y axis
         fft_plot.data[plot_index].y = amplitude_scale.scale(Hmag)
-        // Find the plot index
-        plot_index = get_FFT_data_index(i, 1)
-        // Apply selected scale, set to y axis
-//        fft_plot.data[plot_index].y = array_scale(Hphase, 180 / Math.PI)
-        fft_plot.data[plot_index].y = coh
+        
+        // Set bins
+        fft_plot.data[plot_index].x = scaled_bins
 
+        // Work out if we should show this line
+        fft_plot.data[plot_index].visible = show_set
+
+        // Apply selected scale, set to y axis
+        fft_plot_Phase.data[plot_index].y = array_scale(Hphase, 180 / Math.PI)
+
+        // Set bins
+        fft_plot_Phase.data[plot_index].x = scaled_bins
+
+        // Work out if we should show this line
+        fft_plot_Phase.data[plot_index].visible = show_set
+
+        // Apply selected scale, set to y axis
+        fft_plot_Coh.data[plot_index].y = coh
+
+        // Set bins
+        fft_plot_Coh.data[plot_index].x = scaled_bins
+
+        // Work out if we should show this line
+        fft_plot_Coh.data[plot_index].visible = show_set
     }
 
-    Plotly.redraw("FFTPlot")
+    Plotly.redraw("FFTPlotMag")
+
+    Plotly.redraw("FFTPlotPhase")
+
+    Plotly.redraw("FFTPlotCoh")
 
 }
 
-/*
-// Redraw step response
-function redraw_step() {
-    if ((PID_log_messages == null) || !PID_log_messages.have_data) {
-        return
-    }
-
-    const PID = PID_log_messages[get_axis_index()]
-
-    // Although we re-calculate the FFT, because were just using larger window overlap the original FFT can still be checked for validity
-    const num_sets = PID.sets.length
-    var valid_sets = 0
-    for (let i = 0; i < num_sets; i++) {
-        if ((PID.sets[i] != null) && (PID.sets[i].FFT != null)) {
-            valid_sets += 1
-        }
-
-        // Clear plot
-        const plot_index = i*2
-        step_plot.data[plot_index].x = []
-        step_plot.data[plot_index].y = []
-    }
-    if (valid_sets == 0) {
-        Plotly.redraw("step_plot")
-        return
-    }
-
-    // FFT library, use window size and sample rate from original FFT
-    const window_size = PID.sets.FFT.window_size
-    const real_len = real_length(window_size)
-    const fft = new FFTJS(window_size);
-    var transfer_function = fft.createComplexArray()
-    var impulse_response = fft.createComplexArray()
-
-    // Get windowing function
-    const windowing_function = hanning(window_size)
-
-    // Large overlap to maximize data, 50% must be used to get valid amplitude over data set
-    // Amplitude is not used here so larger overlap is OK
-    const window_spacing = Math.round(window_size / 16)
-
-    // Only plot the first 0.5s of the step
-    const sample_time = 1 / PID.sets.FFT.average_sample_rate
-    const step_end_index = Math.min(Math.ceil(0.5 / sample_time), window_size)
-
-    // Create time array
-    var time = new Array(step_end_index)
-    for (let j=0;j<step_end_index;j++) {
-        time[j] = j * sample_time
-    }
-
-    // Create noise estimate
-    // Size gaussian based on 25 Hz cutoff freq
-    const cutfreq = 25
-    var len_lpf = PID.sets.FFT.bins.findIndex((x) => x > cutfreq)
-    len_lpf += len_lpf - 2 // account for double sided spectrum, DC and Niquist are not copied
-    const radius = Math.ceil(len_lpf * 0.5)
-    const sigma = len_lpf / 6.0
-
-    // convolution of gaussian and unit step is integral
-    var sn = (new Array(real_len)).fill(1.0)
-    var last_sn = 0
-    for (let j=0;j<len_lpf;j++) {
-        sn[j] = last_sn + Math.exp((-0.5/sigma**2) * (j-radius)**2)
-        last_sn = sn[j]
-    }
-    // Normalize to 1
-    for (let j=0;j<len_lpf;j++) {
-        sn[j] /= last_sn
-    }
-    // Reflect for full spectrum
-    sn = [...sn, ...sn.slice(1,real_len-1).reverse()]
-
-    // Scale
-    sn = array_scale(array_offset(array_scale(sn, -1.0), 1+1e-9), 10.0)
-
-    // Pre-calculate inverse
-    sn = array_inverse(sn)
-
-    // For each data set
-    for (let j = 0; j < num_sets; j++) {
-        if (PID.sets[j] == null) {
-            continue
-        }
-        const num_batch = PID.sets[j].length
-        const plot_index = j*2
-
-        var Step_mean = (new Array(step_end_index)).fill(0)
-        var mean_count = 0
-        for (let i=0;i<num_batch;i++) {
-            if (PID.sets[j][i].Tar.length < window_size) {
-                // Log section is too short, skip
-                continue
-            }
-
-            // FFT of target and actual
-            const FFT_res = run_fft(PID.sets[j][i], ["Tar", "Act"], window_size, window_spacing, windowing_function, fft, true)
-            const fft_time = array_offset(array_scale(FFT_res.center, sample_time), PID.sets[j][i].time[0])
-
-            // Find the start and end index
-            const start_index = find_start_index(fft_time)
-            const end_index = find_end_index(fft_time)+1
-
-            for (let k=start_index;k<end_index;k++) {
-
-                // Skip any window with low input amplitude
-                // 20 deg/s threshold
-                if (FFT_res.TarMax[k] < 20.0) {
-                    continue
-                }
-
-                // Step response calculation taken from PID-Analyzer/PIDtoolbox
-                // https://github.com/Plasmatree/PID-Analyzer
-                // https://github.com/bw1129/PIDtoolbox
-                // Some other links that might be useful:
-                // https://en.wikipedia.org/wiki/Wiener_filter
-                // https://en.wikipedia.org/wiki/Ridge_regression#Relation_to_singular-value_decomposition_and_Wiener_filter
-                // Numerical Recipes, Linear Regularization Methods, http://numerical.recipes/
-                // Impact force reconstruction using the regularized Wiener filter method, https://www.tandfonline.com/doi/full/10.1080/17415977.2015.1101760
-
-                const X = to_double_sided(FFT_res.Tar[k])
-                const Y = to_double_sided(FFT_res.Act[k])
-
-                const Xcon = complex_conj(X)
-                const Pyx = complex_mul(Y, Xcon)
-                var Pxx = complex_mul(X, Xcon)
-
-                // Add SNR estimate
-                Pxx[0] = array_add(Pxx[0], sn)
-
-                const H = complex_div(Pyx, Pxx)
-
-                // Populate transfer function in fft.js interleaved complex format
-                to_fft_format(transfer_function, H)
-
-                // Run inverse FFT
-                fft.inverseTransform(impulse_response, transfer_function)
-
-                // Integrate impulse to get step response
-                var step = new Array(step_end_index)
-                step[0] = impulse_response[0]
-                for (let l=1;l<step_end_index;l++) {
-                    // Just real component
-                    step[l] = step[l - 1] + impulse_response[l*2]
-                }
-
-                // Add to mean
-                mean_count += 1
-                Step_mean = array_add(Step_mean, step)
-
-                // add to plot of all
-                step_plot.data[plot_index].x.push(...time)
-                step_plot.data[plot_index].y.push(...step)
-
-                // Add NaN to remove line back to start
-                step_plot.data[plot_index].x.push(NaN)
-                step_plot.data[plot_index].y.push(NaN)
-            }
-
-            if (mean_count <= 0) {
-                // No good steps, skip this set
-                continue
-            }
-
-            // Plot mean
-            step_plot.data[plot_index+1].x = time
-            step_plot.data[plot_index+1].y = array_scale(Step_mean, 1 / mean_count)
-            step_plot.data[plot_index+1].visible = true
-
-            // Show all estimates by default for single set
-            step_plot.data[plot_index].visible = (valid_sets == 1)
-        }
-
-    }
-
-    step_plot.layout.yaxis.range = [0, 2]
-    step_plot.layout.yaxis.autorange = false
-
-    Plotly.redraw("step_plot")
-
-} 
-*/
 // Update lines that are shown in FFT plot
 function update_hidden(source) {
 
