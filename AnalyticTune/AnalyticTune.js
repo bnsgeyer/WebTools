@@ -702,33 +702,38 @@ function redraw() {
 
         }
 
-        var real_sum_in = (new Array(set.FFT.Tar[0][0].length)).fill(0)
-        var im_sum_in = (new Array(set.FFT.Tar[0][0].length)).fill(0)
-        var real_sum_out = (new Array(set.FFT.Act[0][0].length)).fill(0)
-        var im_sum_out = (new Array(set.FFT.Act[0][0].length)).fill(0)
-        var real_sum_inout = (new Array(set.FFT.Tar[0][0].length)).fill(0)
-        var im_sum_inout = (new Array(set.FFT.Tar[0][0].length)).fill(0)
+        var sum_in = array_mul(complex_abs(set.FFT.Tar[start_index]),complex_abs(set.FFT.Tar[start_index]))
+//        var im_sum_in = (new Array(set.FFT.Tar[0][0].length)).fill(0)
+        var sum_out = array_mul(complex_abs(set.FFT.Act[start_index]),complex_abs(set.FFT.Act[start_index]))
+//        var im_sum_out = (new Array(set.FFT.Act[0][0].length)).fill(0)
+        var input_output = complex_mul(complex_conj(set.FFT.Tar[start_index]),set.FFT.Act[start_index])
+        var real_sum_inout = input_output[0]
+        var im_sum_inout = input_output[1]
 
-        for (let k=start_index;k<end_index;k++) {
+        for (let k=start_index+1;k<end_index;k++) {
             // Add to sum
-            var input_sqr = complex_square(set.FFT.Tar[k])
-            var output_sqr = complex_square(set.FFT.Act[k])
-            var input_output = complex_mul(complex_conj(set.FFT.Tar[k]),set.FFT.Act[k])
-            real_sum_in = array_add(real_sum_in, input_sqr[0])
-            im_sum_in = array_add(im_sum_in, input_sqr[1])
-            real_sum_out = array_add(real_sum_out, output_sqr[0])
-            im_sum_out = array_add(im_sum_out, output_sqr[1])
+            var input_sqr = array_mul(complex_abs(set.FFT.Tar[k]),complex_abs(set.FFT.Tar[k]))
+            var output_sqr = array_mul(complex_abs(set.FFT.Act[k]),complex_abs(set.FFT.Act[k]))
+            input_output = complex_mul(complex_conj(set.FFT.Tar[k]),set.FFT.Act[k])
+            sum_in = array_add(sum_in, input_sqr)  // this is now a scalar
+         //   im_sum_in = array_add(im_sum_in, input_sqr[1])
+            sum_out = array_add(sum_out, output_sqr) // this is now a scalar
+         //   im_sum_out = array_add(im_sum_out, output_sqr[1])
             real_sum_inout = array_add(real_sum_inout, input_output[0])
             im_sum_inout = array_add(im_sum_inout, input_output[1])
         }
-        var input_sqr_sum = [real_sum_in, im_sum_in]
-        var output_sqr_sum = [real_sum_out, im_sum_out]
-        var input_output_sum = [real_sum_inout, im_sum_inout]
 
-        const H = complex_div(input_output_sum, input_sqr_sum)
+        Trec = 5
+        fft_scale = 2 / (0.612 * mean_length * Trec)
+        var input_sqr_avg = array_scale(sum_in, fft_scale)
+        var output_sqr_avg = array_scale(sum_out, fft_scale)
+        var input_output_avg = [array_scale(real_sum_inout, fft_scale), array_scale(im_sum_inout, fft_scale)]
 
-        const coh_num = array_mul(complex_abs(input_output_sum),complex_abs(input_output_sum))
-        const coh_den = array_mul(complex_abs(input_sqr_sum), complex_abs(output_sqr_sum))
+        var input_sqr_inv = array_inverse(input_sqr_avg)
+        const H = [array_mul(input_output_avg[0],input_sqr_inv), array_mul(input_output_avg[1],input_sqr_inv)]
+
+        const coh_num = array_mul(complex_abs(input_output_avg),complex_abs(input_output_avg))
+        const coh_den = array_mul(array_abs(input_sqr_avg), array_abs(output_sqr_avg))
         const coh = array_div(coh_num, coh_den)
 
         const Hmag = complex_abs(H)
@@ -742,8 +747,8 @@ function redraw() {
         // Find the plot index
         plot_index = get_FFT_data_index(i, 1)
         // Apply selected scale, set to y axis
-        fft_plot.data[plot_index].y = array_scale(Hphase, 180 / Math.PI)
-//        fft_plot.data[plot_index].y = coh
+//        fft_plot.data[plot_index].y = array_scale(Hphase, 180 / Math.PI)
+        fft_plot.data[plot_index].y = coh
 
     }
 
