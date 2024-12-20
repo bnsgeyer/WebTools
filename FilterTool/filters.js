@@ -160,6 +160,59 @@ function DigitalBiquadFilter(sample_freq, cutoff_freq) {
     return this;
 }
 
+function LeadLagFilter(sample_freq,cutoff_freq_hz,alpha) {
+    this.sample_rate = sample_freq;
+    this.cutoff_freq_hz = cutoff_freq_hz;
+    this.alpha = alpha;
+    this.enabled = false;
+
+    if ((this.cutoff_freq_hz > 0.0) && (this.sample_rate > 0.0) && (this.alpha > 0.0)) {
+        const period = 1.0 / this.sample_rate;
+        const cutoff_freq_rps = 2.0 * Math.PI * this.cutoff_freq_hz;
+        this.b0 =  (2.0 + cutoff_freq_rps * period) * this.sample_rate;
+        this.b1 = (cutoff_freq_rps * period - 2.0) * this.sample_rate;
+        this.a0 = (2.0 + this.alpha * cutoff_freq_rps * period) * this.sample_rate;
+        this.a1 = (this.alpha * cutoff_freq_rps * period - 2.0) * this.sample_rate;        
+        this.enabled = true;
+    } else {
+        this.enabled = false;
+    }
+
+    this.transfer = function(Z, Z1, Z2, use_dB, unwrap_phase) {
+        if (!this.enabled) {
+            const len = Z1[0].length
+            return [new Array(len).fill(1), new Array(len).fill(0)]
+        }
+
+        const len = Z1[0].length
+        let numerator =  [new Array(len), new Array(len)]
+        let denominator =  [new Array(len), new Array(len)]
+        for (let i = 0; i<len; i++) {
+            // H(z) = (b0 + b1*z^-1 + b2*z^-2)/(a0 + a1*z^-1 + a2*z^-2)
+            numerator[0][i] =   this.b0 + this.b1 * Z1[0][i]
+            numerator[1][i] =             this.b1 * Z1[1][i]
+
+            denominator[0][i] = this.a0 + this.a1 * Z1[0][i]
+            denominator[1][i] =           this.a1 * Z1[1][i]
+        }
+
+        const H = complex_div(numerator, denominator)
+
+        this.attenuation = complex_abs(H)
+        this.phase = array_scale(complex_phase(H), 180/Math.PI)
+        if (use_dB) {
+            this.attenuation = array_scale(array_log10(this.attenuation), 20.0)
+        }
+        if (unwrap_phase) {
+            this.phase = unwrap(this.phase)
+        }
+
+        return H
+    }
+
+    return this;
+}
+
 function NotchFilter(sample_freq,center_freq_hz,bandwidth_hz,attenuation_dB) {
     this.sample_freq = sample_freq;
     this.center_freq_hz = center_freq_hz;
@@ -361,7 +414,8 @@ function get_filters(sample_rate) {
                                          get_form("INS_HNTC2_FM_RAT"),
                                          get_form("INS_HNTC2_HMNCS"),
                                          get_form("INS_HNTC2_OPTS")));
-    filters.push(new DigitalBiquadFilter(sample_rate,get_form("INS_GYRO_FILTER")));
+//    filters.push(new DigitalBiquadFilter(sample_rate,get_form("INS_GYRO_FILTER")));
+    filters.push(new LeadLagFilter(sample_rate,10,0.5));
 
     return filters;
 }

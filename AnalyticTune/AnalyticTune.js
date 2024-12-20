@@ -385,6 +385,60 @@ function NotchFilter(sample_freq,center_freq_hz,bandwidth_hz,attenuation_dB) {
     return this;
 }
 
+function LeadLagFilter(sample_freq,cutoff_freq_hz,alpha) {
+    this.sample_rate = sample_freq;
+    this.cutoff_freq_hz = cutoff_freq_hz;
+    this.alpha = alpha;
+    this.initialised = false;
+
+    if ((this.cutoff_freq_hz > 0.0) && (this.sample_rate > 0.0) && (this.alpha > 0.0)) {
+        const period = 1.0 / this.sample_rate;
+        const cutoff_freq_rps = 2.0 * Math.PI * this.cutoff_freq_hz;
+        this.b0 =  (2.0 + cutoff_freq_rps * period) * this.sample_rate;
+        this.b1 = (cutoff_freq_rps * period - 2.0) * this.sample_rate;
+        this.a0 = (2.0 + this.alpha * cutoff_freq_rps * period) * this.sample_rate;
+        this.a1 = (this.alpha * cutoff_freq_rps * period - 2.0) * this.sample_rate;        
+        this.initialised = true;
+    } else {
+        this.initialised = false;
+    }
+
+    this.transfer = function(Z, Z1, Z2, use_dB, unwrap_phase) {
+        if (!this.initialised) {
+            const len = Z1[0].length
+            return [new Array(len).fill(1), new Array(len).fill(0)]
+        }
+
+        const len = Z1[0].length
+        let numerator =  [new Array(len), new Array(len)]
+        let denominator =  [new Array(len), new Array(len)]
+        for (let i = 0; i<len; i++) {
+            // H(z) = (b0 + b1*z^-1 + b2*z^-2)/(a0 + a1*z^-1 + a2*z^-2)
+            numerator[0][i] =   this.b0 + this.b1 * Z1[0][i]
+            numerator[1][i] =             this.b1 * Z1[1][i]
+
+            denominator[0][i] = this.a0 + this.a1 * Z1[0][i]
+            denominator[1][i] =           this.a1 * Z1[1][i]
+        }
+
+        const H = complex_div(numerator, denominator)
+
+        this.attenuation = complex_abs(H)
+        this.phase = array_scale(complex_phase(H), 180/Math.PI)
+        if (use_dB) {
+            this.attenuation = array_scale(array_log10(this.attenuation), 20.0)
+        }
+        if (unwrap_phase) {
+            this.phase = unwrap(this.phase)
+        }
+
+        return H
+    }
+
+    return this;
+}
+
+
 function get_PID_param_names() {
     let prefix = ["ATC_RAT_RLL_", "ATC_RAT_PIT_", "ATC_RAT_YAW_"]
     let ret = []
@@ -1326,6 +1380,13 @@ function calculate_freq_resp() {
         coh_att_tf[k-1] = coh_att[k]
         freq_tf[k-1] = data_set.FFT.bins[k]
     }
+
+    var leadlag_filter = []
+    leadlag_filter.push(new LeadLagFilter(sample_rate, 0.2, 0))
+    var freq_max = sample_rate * 0.5
+    var freq_step = sample_rate / window_size;
+    const LEADLAG_H = evaluate_transfer_functions([leadlag_filter], freq_max, freq_step, false, false)
+    H_acft_tf = complex_mul(LEADLAG_H.H_total, H_acft_tf)
 
     var H_rate_pred
     var H_att_pred
