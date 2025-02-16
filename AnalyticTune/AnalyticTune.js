@@ -2271,3 +2271,39 @@ function set_sid_axis(axis) {
     sid_axis = axis
     axis_changed()
 }
+
+function save_frequency_response() {
+    var freq_resp = []
+/*    calc_freq_resp = {
+        pilotctrl_H: H_pilot_tf,
+        pilotctrl_coh: coh_pilot_tf,
+        attctrl_H: H_att_tf,
+        attctrl_coh: coh_att_tf,
+        ratectrl_H: H_rate_tf,
+        ratectrl_coh: coh_rate_tf,
+        bareAC_H: H_acft_tf,
+        bareAC_coh: coh_acft_tf,
+        DRB_H: H_drb_tf,
+        DRB_coh: coh_drb_tf,
+        sysbl_H: H_sys_bl_tf,
+        sysbl_coh: coh_sys_bl_tf,
+        freq: freq_tf
+*/
+    var attctrl_gain = amplitude_scale.scale(complex_abs(calc_freq_resp.attctrl_H))
+    var attctrl_phase = array_scale(complex_phase(calc_freq_resp.attctrl_H), 180 / Math.PI)
+    var ratectrl_gain = amplitude_scale.scale(complex_abs(calc_freq_resp.ratectrl_H))
+    var ratectrl_phase = array_scale(complex_phase(calc_freq_resp.ratectrl_H), 180 / Math.PI)
+    var bareAC_gain = amplitude_scale.scale(complex_abs(calc_freq_resp.bareAC_H))
+    var bareAC_phase = array_scale(complex_phase(calc_freq_resp.bareAC_H), 180 / Math.PI)
+    var datastring = "freq, att ctrl gain (db), att ctrl phase(deg), att ctrl coh, rate ctrl gain (db), rate ctrl phase(deg), rate ctrl coh, bareAC gain (db), bareAC phase(deg), bareAC coh\n"
+    for (j=0; j<calc_freq_resp.freq.length;j++) {
+        var joined_data = []
+        joined_data = [calc_freq_resp.freq[j],attctrl_gain[j],attctrl_phase[j],calc_freq_resp.attctrl_coh[j],ratectrl_gain[j],ratectrl_phase[j],calc_freq_resp.ratectrl_coh[j],bareAC_gain[j],bareAC_phase[j],calc_freq_resp.bareAC_coh[j]]
+        joined_data_string = joined_data.join(',')
+        datastring = datastring + joined_data_string + "\n"
+    }
+    console.log(datastring)
+    var blob = new Blob([datastring], { type: "text/plain;charset=utf-8" });
+    saveAs(blob, "freq_resp.txt");
+
+}
