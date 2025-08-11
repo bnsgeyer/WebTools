@@ -1541,9 +1541,9 @@ function load_time_history_data(t_start, t_end, axis) {
         ind2_a = nearestIndex(timeATT, t_end*1000000)
     }
 
-    const timeSIDD = log.get("SIDD", "TimeUS")
-    const ind1_s = nearestIndex(timeSIDD, t_start*1000000)
-    const ind2_s = nearestIndex(timeSIDD, t_end*1000000)
+//    const timeSIDD = log.get("SIDD", "TimeUS")
+//    const ind1_s = nearestIndex(timeSIDD, t_start*1000000)
+//    const ind2_s = nearestIndex(timeSIDD, t_end*1000000)
 
     var ActInputParam = ""
     var RateTgtParam = ""
@@ -1585,7 +1585,7 @@ function load_time_history_data(t_start, t_end, axis) {
         AttTgtData = Array.from(log.get("ATT", AttTgtParam))
         AttData = Array.from(log.get("ATT", AttParam))
     }
-    let GyroRawData = Array.from(log.get("SIDD", GyroRawParam))
+    let GyroRawData = Array.from(log.get("RATE", RateParam))
 
     // Slice ActInputData
     ActInputData = ActInputData.slice(ind1_i, ind2_i)
@@ -1606,12 +1606,13 @@ function load_time_history_data(t_start, t_end, axis) {
 
 
     // Slice GyroRawData and Convert data from degrees/second to radians/second
-    GyroRawData = GyroRawData.slice(ind1_s, ind2_s)
+    GyroRawData = GyroRawData.slice(ind1_i, ind2_i)
     GyroRawData = array_scale(GyroRawData, 0.01745)
     // Pull and Slice PilotInputData
-    let PilotInputData = Array.from(log.get("SIDD", "Targ"))
-    PilotInputData = PilotInputData.slice(ind1_s, ind2_s)
-    PilotInputData = array_scale(PilotInputData, 0.01745)
+//    let PilotInputData = Array.from(log.get("SIDD", "Targ"))
+//    PilotInputData = PilotInputData.slice(ind1_s, ind2_s)
+//    PilotInputData = array_scale(PilotInputData, 0.01745)
+    PilotInputData = AttTgtData
 
     // Pull Targ for input to Attitude Disturbance Rejection Transfer Function
     DRBInputData = PilotInputData
