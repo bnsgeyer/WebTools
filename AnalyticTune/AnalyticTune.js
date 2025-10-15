@@ -1660,32 +1660,39 @@ function load_vtol_time_history_data(t_start, t_end, axis) {
         AttData = Array.from(log.get("ATT", AttParam))
     }
     let GyroRawData = Array.from(log.get("SIDD", GyroRawParam))
-
+    const cuto_freq = 10
     // Slice ActInputData
     ActInputData = ActInputData.slice(ind1_i, ind2_i)
+    ActInputData = signal_cond_data(cuto_freq, ActInputData, samplerate)
     // Slice RateTgtData and Convert data from degrees/second to radians/second
     RateTgtData = RateTgtData.slice(ind1_i, ind2_i)
     RateTgtData = array_scale(RateTgtData, 0.01745)
+    RateTgtData = signal_cond_data(cuto_freq, RateTgtData, samplerate)
     // Slice RateData and Convert data from degrees/second to radians/second
     RateData = RateData.slice(ind1_i, ind2_i)
     RateData = array_scale(RateData, 0.01745)
+    RateData = signal_cond_data(cuto_freq, RateData, samplerate)
 
 
     // Slice AttTgtData Convert data from degrees/second to radians/second
     AttTgtData = AttTgtData.slice(ind1_a, ind2_a)
     AttTgtData = array_scale(AttTgtData, 0.01745)
+    AttTgtData = signal_cond_data(cuto_freq, AttTgtData, samplerate)
     // Slice AttData and Convert data from degrees/second to radians/second
     AttData = AttData.slice(ind1_a, ind2_a)
     AttData = array_scale(AttData, 0.01745)
+    AttData = signal_cond_data(cuto_freq, AttData, samplerate)
 
 
     // Slice GyroRawData and Convert data from degrees/second to radians/second
     GyroRawData = GyroRawData.slice(ind1_s, ind2_s)
     GyroRawData = array_scale(GyroRawData, 0.01745)
+    GyroRawData = signal_cond_data(cuto_freq, GyroRawData, samplerate)
     // Pull and Slice PilotInputData
     let PilotInputData = Array.from(log.get("SIDD", "Targ"))
     PilotInputData = PilotInputData.slice(ind1_s, ind2_s)
     PilotInputData = array_scale(PilotInputData, 0.01745)
+    PilotInputData = signal_cond_data(cuto_freq, PilotInputData, samplerate)
 
     // Pull Targ for input to Attitude Disturbance Rejection Transfer Function
     DRBInputData = PilotInputData
@@ -1709,6 +1716,22 @@ function load_vtol_time_history_data(t_start, t_end, axis) {
         SysBLOutput: SysBLOutputData
     }
     return [data, samplerate]
+
+}
+
+function signal_cond_data(co_freq_hz, signal_data, s_rate) {
+    const rc = 1.0 / (2.0 * Math.PI * co_freq_hz)
+    const dt = 1.0 / s_rate
+    const alfa = dt / (dt + rc)
+    const len = signal_data.length
+    var output = new Array(len).fill(0)
+
+    output[0] = signal_data[0]
+    for (var j = 1; j<len; j++) {
+        output[j] = output[j-1]+(signal_data[j] - output[j-1]) * alfa;
+
+    }
+    return output
 
 }
 
