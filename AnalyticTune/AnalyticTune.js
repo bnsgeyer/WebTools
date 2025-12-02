@@ -2157,7 +2157,7 @@ function redraw_freq_resp() {
     } else if (document.getElementById("type_Att_Ctrlr_nff").checked) {
         calc_data = calc_freq_resp.attctrl_H
         calc_data_coh = calc_freq_resp.attctrl_coh
-        if (sid_axis < 4 || (sid_axis > 6 && sid_axis < 20) || sid_axis > 22) {
+        if (sid_axis < 4 || (sid_axis > 6 && sid_axis < 20) || sid_axis > 21) {
             show_set_calc = false
         }
         pred_data = pred_freq_resp.attctrl_nff_H  // attitude controller without feedforward
@@ -2342,11 +2342,8 @@ function add_sid_sets() {
        19: "Input Longitudinal Velocity",
        20: "FW Input Roll Angle",
        21: "FW Input Pitch Angle",
-       22: "FW Input Yaw Angle",
-       23: "FW Mixer Roll",
-       24: "FW Mixer Pitch",
-       25: "FW Mixer Yaw",
-       26: "FW Mixer Thrust"
+       22: "FW Mixer Roll",
+       23: "FW Mixer Pitch"
     }
 
     const num_sets = sid_sets.axis.length
@@ -2428,11 +2425,11 @@ function update_time_range() {
 
 function set_sid_axis(axis) {
 
-    if (axis == 1 || axis == 4 || axis == 7 || axis == 10 || axis == 20 || axis == 23) {
+    if (axis == 1 || axis == 4 || axis == 7 || axis == 10 || axis == 20 || axis == 22) {
         page_axis = "Roll"
-    } else if (axis == 2 || axis == 5 || axis == 8 || axis == 11 || axis == 21 || axis == 24) {
+    } else if (axis == 2 || axis == 5 || axis == 8 || axis == 11 || axis == 21 || axis == 23) {
         page_axis = "Pitch"
-    } else if (axis == 3 || axis == 6 || axis == 9 || axis == 12 || axis == 22 || axis == 25) {
+    } else if (axis == 3 || axis == 6 || axis == 9 || axis == 12) {
         page_axis = "Yaw"
     }
     sid_axis = axis
