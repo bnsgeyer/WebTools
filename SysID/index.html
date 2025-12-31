@@ -1,901 +1,486 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
-  <head>
+<head>
     <meta charset="utf-8"/>
-
-    <title>ArduPilot SysID</title>
+    <title>ArduPilot SysID (JS Native)</title>
     <link rel="icon" href="../images/AP_favicon.png">
 
-    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.js"></script>
-
-    <script src='../modules/plotly.js/dist/plotly.min.js'></script>
-
+    <!-- Mathematics and Signal Processing Libraries -->
+    <script type="text/javascript" src="../Libraries/fft.js"></script>
     <script type="text/javascript" src="../Libraries/Array_Math.js"></script>
+    <script type="text/javascript" src="../Libraries/Plotly_helpers.js"></script>
+    <script type="text/javascript" src="../Libraries/LogHelpers.js"></script>
 
-    <script type="text/javascript" src="SysID.js"></script>
-  </head>
+    <script src="math.js"></script>
+    <script src="../node_modules/fili/dist/fili.min.js"></script>
+    <script src="ml.min.js"></script>
 
-  <style>
-    div.plotly-notifier {
-      visibility: hidden;
-    }
-  </style>
+    <script src="../modules/build/floating-ui/dist/umd/popper.min.js"></script>
+    <script src="../modules/build/tippyjs/dist/tippy-bundle.umd.min.js"></script>
+    <script src="../modules/plotly.js/dist/plotly.min.js"></script>
+    <script src='../modules/fft.js/dist/fft.js'></script>
 
-  <table style="width:1200px">
-    <tr><td>
-      <a href="https://ardupilot.org"><img src="../images/ArduPilot.png"></a>
-    </td><td>
-      <a href="https://github.com/ArduPilot/WebTools"><img src="../images/github-mark.png" style="width:60px"></a>
-      <br>
-      <a href="https://github.com/ArduPilot/WebTools"><img src="../images/GitHub_Logo.png" style="width:60px"></a>
-    </td></tr>
-  </table>
-  <table>
-    <tr><td style="width:1200px">
-      <h1 style="text-align:center; margin-block-end: 0.25em;"><a href="" style="color: #000000; text-decoration:none;">ArduPilot System Identification Tool</a></h1>
-    </td></tr>
-  </table>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        div.plotly-notifier { visibility: hidden; }
+        .setup-field { width: 1200px; margin-bottom: 20px; }
+        fieldset { border: 1px solid #ccc; padding: 15px; border-radius: 5px; }
+        input[type="number"], input[type="text"] { padding: 5px; border: 1px solid #ccc; }
+        button { padding: 10px 20px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
+        button:disabled { background: #ccc; }
+        textarea { font-family: monospace; background: #f8f8f8; }
+    </style>
+</head>
 
-  <body>
-
-  <table>
-    <tr>
-    <td style="width: 30px;"></td>
-    <td>
-    <fieldset style="width:1100px">
-      <legend>Setup</legend>
-      <table>
+<body>
+    <table style="width:1200px">
         <tr>
-          <td>
-            <fieldset style="width:200px;height:80px">
-              <legend>Analysis time</legend>
-              <label for="starttime">Start (s)</label>
-              <input id="starttime" type="number" min="0" step="1" value="0" style="width:50px"/><br><br>
-              <label for="endtime">End (s)</label>
-              <input id="endtime" type="number" min="0" step="1" value="0" style="width:50px"/>
-            </fieldset>
-          </td>
-          <td style="width: 10px;"></td>
-          <td>
-            <input id="fileItem" type="file" accept=".bin" onchange="readFile(this)"><br><br>
-          </td>
+            <td><a href="https://ardupilot.org"><img src="../images/ArduPilot.png" width="100"></a></td>
+            <td><h1>ArduPilot System Identification (Native JS)</h1></td>
         </tr>
-      </table>
+    </table>
+
+    <fieldset class="setup-field">
+        <legend>Setup</legend>
+        <label>Start (s): <input id="starttime" type="number" step="1" value="0"></label>
+        <label>End (s): <input id="endtime" type="number" step="1" value="0"></label>
+        <input id="fileItem" type="file" accept=".bin" onchange="readFile(this)" style="margin-left: 50px;">
     </fieldset>
-    </td>
-    </tr>
-  </table>
 
-  <table><tr><td style="width:1200px">
-    <h2 style="text-align:center">Flight Data</h2>
-  </td></tr></table>
+    <div id="FlightData" style="width:1200px;height:400px"></div>
 
-  <div id="FlightData" style="width:1200px;height:450px"></div>
-
-    <div>
-      <p>Output:</p>
-      <textarea id="output" style="width: 1200px; height: 500px;" rows="10" disabled></textarea>
+    <div style="margin: 20px 0;">
+        <input type="radio" id="tf_select" name="ID_type" checked> <label for="tf_select">Transfer Function Identification</label>
+        <br><br>
+        <div id="tf_form">
+            <div id="tf_inputFieldsContainer"></div>
+            <div id="tf_outputFieldsContainer"></div>
+            <br>
+            <label>Numerator: <input type="text" id="customNumerator" value="K" placeholder="e.g. K"></label>
+            <label>Denominator: <input type="text" id="customDenominator" value="s + a" placeholder="e.g. s^2 + a*s + b"></label>
+            <label>Symbols: <input type="text" id="tf_params" value="K, a" placeholder="K, a"></label>
+        </div>
     </div>
 
-    <div>
-      <form id="customForm">
-        <input type="radio" id="tf_select" name="ID_type">
-        <label for="tf_select">Transfer function</label>
-
-        <input type="radio" id="ss_select" name="ID_type">
-        <label for="ss_select">State Space</label><br><br>
-      </form>
+    <div style="margin-bottom: 20px;">
+        <label>Start Freq (rad/s): <input type="number" id="startfreq" value="1"></label>
+        <label>End Freq (rad/s): <input type="number" id="endfreq" value="50"></label>
+        <label>LPF Cutoff (rad/s): <input type="number" id="cutofffreq" value="100"></label>
+        <label>FFT Window Size: <input id="FFTWindow_size" name="FFTWindow_size" type="number" min="1" step="1" value="1024" onchange="window_size_inc(event)" style="width:50px"/></label>
+        <button id="parseButton" type="button" disabled onclick="runIdentification()">Run Identification</button>
     </div>
 
-    <!-- FOR TRANSFER FUNCTION -->
-    <div id="tf_form" style="display:none;">
-
-      <div id="tf_inputFieldsContainer"></div>
-      <br><br>
-
-      <div id="tf_outputFieldsContainer"></div>
-      <br><br>
-
-      <label for="customNumerator">Numerator:</label>
-      <input type="text" id="customNumerator" name="customNumerator"><br><br>
-
-      <label for="customDenominator">Denominator:</label>
-      <input type="text" id="customDenominator" name="customDenominator"><br><br>
-
-      <label for="tf_params">Symbolic params:</label>
-      <input type="text" id="tf_params" name="tf_params"><br><br>
-
-      <div id="plotDiv"></div>
-
-    </div>
-
-    <!-- FOR STATE SPACE MODEL -->
-    <div id="ss_form" style="display:none;">
-
-      <div id="autopopulateContainer"></div>
-      <br><br>
-
-      <label for="No. of Outputs">Outputs:</label>
-      <input type="number" id="num_Outputs" name="Outputs">
-
-      <label for="Matrix A order">Matrix A order:</label>
-      <input type="number" id="A_order" name="Inputs">
-
-      <label for="number of params">Number of params:</label>
-      <input type="number" id="num_params" name="Inputs">
-
-      <label for="number of constraints">Number of Constraints:</label>
-      <input type="number" id="num_cons" name="Inputs"><br><br>
-
-      <button id="createFieldsButton" type="button">Generate fields</button>
-      <br><br>
-
-      <div id="inputFieldsContainer"></div>
-      <br><br>
-      <div id="outputFieldsContainer"></div>
-      <br><br>
-      <div id="symbolicparams"></div>
-      <br><br>
-      <div id="boundsContainer"></div>
-      <br><br>
-
-      <div id="matrixAlabel"></div>
-      <br>
-      <table id="matrixA"></table>
-      <br><br>
-
-      <div id="matrixBlabel"></div>
-      <br>
-      <table id="matrixB"></table>
-      <br><br>
-
-      <div id="constraintsinput"></div>
-      <br><br>
-
-      <div id="H0label"></div>
-      <br>
-      <table id="H0"></table>
-      <br><br>
-
-      <div id="H1label"></div>
-      <br>
-      <table id="H1"></table>
-      <br><br>
-
-      <div id="plotDiv_ss"></div>
-    </div>
-
-    <div>
-      <label for="start frequency">Start frequency (rad/sec):</label>
-      <input type="number" id="startfreq" name="startfreq">
-
-      <label for="end frequency">End frequency (rad/sec):</label>
-      <input type="number" id="endfreq" name="endfreq"><br><br>
-
-      <label for="LPF cutoff frequency">LPF cutoff frequency (rad/sec):</label>
-      <input type="number" id="cutofffreq" name="cutofffreq"><br><br>
-
-      <button id="parseButton" type="button" disabled>Submit</button>
-    </div>
-
-    <script type="text/javascript">
-      // Setup python environment
-      init_pyodide()
-
-      // Setup flight data plot
-      setup_flight_data_plot()
-
-      // Handler for file select
-      function readFile(e) {
-        const file = e.files[0]
-        if (file == null) {
-          return
-        }
-        let reader = new FileReader()
-        reader.onload = function (e) {
-          load(reader.result)
-          document.title = "SysID: " + file.name
-        }
-        reader.readAsArrayBuffer(file)
-      }
-
-      async function main() {
-        const output = document.getElementById("output");
-        output.value = '';
-        function addToOutput(message) {
-          output.value += message + "\n";
-        }
-
-        function createautopopulate(containerId) {
-          const container = document.getElementById(containerId);
-          container.innerHTML = '';
-
-          const populateDropdown = document.createElement('select');
-          populateDropdown.id = 'populate_dropdown';
-          populateDropdown.name = 'populate_dropdown';
-          populateDropdown.style.display = 'block'; // Hidden by default
-
-          const option1 = document.createElement('option');
-          option1.value = 'manual';
-          option1.text = 'Manual Entry';
-          populateDropdown.appendChild(option1);
-
-          const option2 = document.createElement('option');
-          option2.value = 'MR_Roll';
-          option2.text = 'Multirotor Roll';
-          populateDropdown.appendChild(option2);
-
-          const option3 = document.createElement('option');
-          option3.value = 'MR_Pitch';
-          option3.text = 'Multirotor Pitch';
-          populateDropdown.appendChild(option3);
-
-          const option4 = document.createElement('option');
-          option4.value = 'MR_Yaw';
-          option4.text = 'Multirotor Yaw';
-          populateDropdown.appendChild(option4);
-
-          const option5 = document.createElement('option');
-          option5.value = 'MR_Vertical';
-          option5.text = 'Multirotor Vertical';
-          populateDropdown.appendChild(option5);
-
-          const populateLabel = document.createElement('label');
-          populateLabel.textContent = 'Enter fields or select to pre-populate fields:';
-          populateLabel.style.display = 'block'; // Hidden by default
-          container.appendChild(populateLabel);
-          container.appendChild(populateDropdown);
-        }
-
-        function createMatrixTable(tableId, rows, cols, labelname) {
-
-          const container = document.getElementById(`${tableId}label`);
-          container.innerHTML = '';
-
-          const label = document.createElement('label');
-          label.textContent = `${labelname}:`;
-          container.appendChild(label);
-
-          const table = document.getElementById(tableId);
-          table.innerHTML = ''; // Clear any existing cells
-
-          for (let i = 0; i < rows; i++) {
-            const row = table.insertRow();
-            for (let j = 0; j < cols; j++) {
-              const cell = row.insertCell();
-              const input = document.createElement('input');
-              input.type = 'text';
-              input.name = `${tableId}_r${i}_c${j}`;
-              cell.appendChild(input);
-            }
-          }
-        }
-        function createsymbolicfields(containerId, labelPrefix, numFields) {
-          const container = document.getElementById(containerId);
-          container.innerHTML = '';
-
-          for (let i=0; i< numFields; i++) {
-            const label = document.createElement('label');
-            label.textContent = `${labelPrefix} ${i + 1}:`;
-            container.appendChild(label);
-
-            const inputName = document.createElement('input');
-            inputName.type = 'text';
-            inputName.name = `${'param'}_name_${i + 1}`;
-            inputName.id = `${'param'}_name_${i + 1}`;
-            container.appendChild(inputName);
-          }
-          container.appendChild(document.createElement('br'));
-        }
-
-        function createBoundsField(containerId, labelPrefix, numParams) {
-          const container = document.getElementById(containerId);
-          container.innerHTML = '';
-
-          for (let i=0; i< numParams; i++) {
-            const label = document.createElement('label');
-            label.textContent = `${labelPrefix} ${i + 1}:`;
-            container.appendChild(label);
-
-            const inputName = document.createElement('input');
-            inputName.type = 'number';
-            inputName.name = `${'Bound'}_min_${i + 1}`;
-            inputName.id = `${'Bound'}_min_${i + 1}`;
-            container.appendChild(inputName);
-
-            const inputField = document.createElement('input');
-            inputField.type = 'number';
-            inputField.name = `${'Bound'}_max_${i + 1}`;
-            inputField.id = `${'Bound'}_max_${i + 1}`;
-            container.appendChild(inputField);
-
-          }
-          container.appendChild(document.createElement('br'));
-        }
-
-
-        function createConstraintsField(containerId, labelPrefix, numParams) {
-          const container = document.getElementById(containerId);
-          container.innerHTML = '';
-
-          for (let i=0; i< numParams; i++) {
-            const label = document.createElement('label');
-            label.textContent = `${labelPrefix} ${i + 1}:`;
-            container.appendChild(label);
-
-            const inputName = document.createElement('input');
-            inputName.type = 'text';
-            inputName.name = `${'Constraint'}_A_${i + 1}`;
-            inputName.id = `${'Constraint'}_A_${i + 1}`;
-            container.appendChild(inputName);
-
-            const inputField = document.createElement('input');
-            inputField.type = 'text';
-            inputField.name = `${'Constraint'}_B_${i + 1}`;
-            inputField.id = `${'Constraint'}_B_${i + 1}`;
-            container.appendChild(inputField);
-
-          }
-          container.appendChild(document.createElement('br'));
-        }
-
-
-        function createInputFields(containerId, labelPrefix, inputNamePrefix, numFields, includeMultiplier = false, includeCompensation = false) {
-          const container = document.getElementById(containerId);
-          container.innerHTML = '';  // Clear any existing fields
-
-          for (let i = 0; i < numFields; i++) {
-            const label = document.createElement('label');
-            label.textContent = `${labelPrefix} ${i + 1}:`;
-            container.appendChild(label);
-
-            const inputName = document.createElement('select');
-            inputName.name = `${inputNamePrefix}_name_${i + 1}`;
-            inputName.id = `${inputNamePrefix}_name_${i + 1}`;
-            inputName.disabled = true
-            container.appendChild(inputName);
-
-            const inputField = document.createElement('select');
-            inputField.name = `${inputNamePrefix}_field_${i + 1}`;
-            inputField.id = `${inputNamePrefix}_field_${i + 1}`;
-            inputField.disabled = true
-            container.appendChild(inputField);
-
-            if (includeMultiplier) {
-              const multiplierCheckbox = document.createElement('input');
-              multiplierCheckbox.type = 'checkbox';
-              multiplierCheckbox.id = `multiplier_checkbox_${i + 1}`;
-              multiplierCheckbox.name = `multiplierCheckbox_${i + 1}`;
-              container.appendChild(multiplierCheckbox);
-
-              const multiplierLabel = document.createElement('label');
-              multiplierLabel.htmlFor = `multiplier_checkbox_${i + 1}`;
-              multiplierLabel.textContent = 'Multiplier';
-              container.appendChild(multiplierLabel);
-
-              const multiplierInput = document.createElement('input');
-              multiplierInput.type = 'text';
-              multiplierInput.id = `multiplier_${i + 1}`;
-              multiplierInput.name = `multiplier_${i + 1}`;
-              multiplierInput.style.display = 'none';
-              container.appendChild(multiplierInput);
-
-              multiplierCheckbox.addEventListener('change', function () {
-              multiplierInput.style.display = this.checked ? 'inline' : 'none';
-              });
-            }
-
-            if (includeCompensation) {
-              const compensationCheckbox = document.createElement('input');
-              compensationCheckbox.type = 'checkbox';
-              compensationCheckbox.id = `compensation_checkbox_${i + 1}`;
-              compensationCheckbox.name = `compensationCheckbox_${i + 1}`;
-              container.appendChild(compensationCheckbox);
-
-              const compensationLabel = document.createElement('label');
-              compensationLabel.htmlFor = `compensation_checkbox_${i + 1}`;
-              compensationLabel.textContent = 'Gravity Compensation ';
-              container.appendChild(compensationLabel);
-
-              const axisDropdown = document.createElement('select');
-              axisDropdown.id = `axis_dropdown_${i + 1}`;
-              axisDropdown.name = `axis_dropdown_${i + 1}`;
-              axisDropdown.style.display = 'none'; // Hidden by default
-
-              const option1 = document.createElement('option');
-              option1.value = 'Roll';
-              option1.text = 'Roll';
-              axisDropdown.appendChild(option1);
-
-              const option2 = document.createElement('option');
-              option2.value = 'Pitch';
-              option2.text = 'Pitch';
-              axisDropdown.appendChild(option2);
-
-              const axisLabel = document.createElement('label');
-              axisLabel.textContent = 'Axis:';
-              axisLabel.style.display = 'none'; // Hidden by default
-              container.appendChild(axisLabel);
-              container.appendChild(axisDropdown);
-
-              compensationCheckbox.addEventListener('change', function () {
-                const isChecked = this.checked;
-                axisDropdown.style.display = isChecked ? 'inline' : 'none';
-                axisLabel.style.display = isChecked ? 'inline' : 'none';
-              });
-            }
-            container.appendChild(document.createElement('br'));
-          }
-        }
-
-        function setinputValues(vehicle_axis) {
-          if (vehicle_axis == "MR_Roll" || vehicle_axis == "MR_Pitch") {
-            document.getElementById('num_Outputs').value = "2"
-            document.getElementById('num_params').value = "6"
-            document.getElementById('A_order').value = "4"
-            document.getElementById('num_cons').value = "1"
-          } else if (vehicle_axis == "MR_Yaw") {
-            document.getElementById('num_Outputs').value = "1"
-            document.getElementById('num_params').value = "5"
-            document.getElementById('A_order').value = "2"
-            document.getElementById('num_cons').value = "1"
-          } else if (vehicle_axis == "MR_Vertical") {
-            document.getElementById('num_Outputs').value = "1"
-            document.getElementById('num_params').value = "4"
-            document.getElementById('A_order').value = "2"
-            document.getElementById('num_cons').value = "1"
-          }
-        }
-
-        function setParamValues(vehicle_axis) {
-
-          if (vehicle_axis == "MR_Roll") {
-            document.getElementById(`${'param'}_name_${1}`).value = "Yv";
-            document.getElementById(`${'param'}_name_${2}`).value = "Ylat";
-            document.getElementById(`${'param'}_name_${3}`).value = "Lv";
-            document.getElementById(`${'param'}_name_${4}`).value = "Llat";
-            document.getElementById(`${'param'}_name_${5}`).value = "wlag";
-            document.getElementById(`${'param'}_name_${6}`).value = "wlg";
-          } else if (vehicle_axis == "MR_Pitch") {
-            document.getElementById(`${'param'}_name_${1}`).value = "Xu";
-            document.getElementById(`${'param'}_name_${2}`).value = "Xlon";
-            document.getElementById(`${'param'}_name_${3}`).value = "Mu";
-            document.getElementById(`${'param'}_name_${4}`).value = "Mlon";
-            document.getElementById(`${'param'}_name_${5}`).value = "wlag";
-            document.getElementById(`${'param'}_name_${6}`).value = "wlg";
-          } else if (vehicle_axis == "MR_Yaw") {
-            document.getElementById(`${'param'}_name_${1}`).value = "Nr";
-            document.getElementById(`${'param'}_name_${2}`).value = "Nped";
-            document.getElementById(`${'param'}_name_${3}`).value = "Npedp";
-            document.getElementById(`${'param'}_name_${4}`).value = "wlag";
-            document.getElementById(`${'param'}_name_${5}`).value = "wlg";
-          } else if (vehicle_axis == "MR_Vertical") {
-            document.getElementById(`${'param'}_name_${1}`).value = "Zw";
-            document.getElementById(`${'param'}_name_${2}`).value = "Zcoll";
-            document.getElementById(`${'param'}_name_${3}`).value = "wlag";
-            document.getElementById(`${'param'}_name_${4}`).value = "wlg";
-          }
-        }
-
-        function setInputFields(vehicle_axis) {
-
-          // Set message value and trigger on change event to regenerate the available fields
-          const input = document.getElementById(`${'input'}_name_${1}`)
-          input.value = "RATE"
-          input.onchange()
-
-          if (vehicle_axis == "MR_Roll") {
-            document.getElementById(`${'input'}_field_${1}`).value = "ROut";
-          } else if (vehicle_axis == "MR_Pitch") {
-            document.getElementById(`${'input'}_field_${1}`).value = "POut";
-          } else if (vehicle_axis == "MR_Yaw") {
-            document.getElementById(`${'input'}_field_${1}`).value = "YOut";
-          } else if (vehicle_axis == "MR_Vertical") {
-            document.getElementById(`${'input'}_field_${1}`).value = "AOut";
-          }
-        }
-
-        function setOutputFields(vehicle_axis) {
-
-          function set_select(ele, val) {
-            ele.value = val
-            ele.onchange()
-          }
-
-          set_select(document.getElementById(`${'output'}_name_${1}`), "SIDD")
-
-          if (vehicle_axis == "MR_Roll" || vehicle_axis == "MR_Pitch") {
-            document.getElementById(`multiplier_checkbox_${1}`).checked = true;
-            document.getElementById(`multiplier_${1}`).style.display = "block";
-            document.getElementById(`multiplier_${1}`).value ="0.01745";
-            set_select(document.getElementById(`${'output'}_name_${2}`), "SIDD")
-            document.getElementById(`compensation_checkbox_${2}`).checked = true;
-            document.getElementById(`axis_dropdown_${2}`).style.display = "block";
-            if (vehicle_axis == "MR_Roll") {
-              document.getElementById(`${'output'}_field_${1}`).value = "Gx";
-              document.getElementById(`${'output'}_field_${2}`).value = "Ay";
-              document.getElementById(`axis_dropdown_${2}`).value = "Roll";
-            } else if (vehicle_axis == "MR_Pitch") {
-              document.getElementById(`${'output'}_field_${1}`).value = "Gy";
-              document.getElementById(`${'output'}_field_${2}`).value = "Ax";
-              document.getElementById(`axis_dropdown_${2}`).value = "Pitch";
-            }
-          } else if (vehicle_axis == "MR_Yaw") {
-            document.getElementById(`${'output'}_field_${1}`).value = "Gz";
-            document.getElementById(`multiplier_checkbox_${1}`).checked = true;
-            document.getElementById(`multiplier_${1}`).style.display = "block";
-            document.getElementById(`multiplier_${1}`).value ="0.01745";
-          } else if (vehicle_axis == "MR_Vertical") {
-            document.getElementById(`${'output'}_field_${1}`).value = "Az";
-          }
-        }
-
-        function setConstraintList(vehicle_axis) {
-          if (vehicle_axis == "MR_Roll" || vehicle_axis == "MR_Pitch") {
-            document.getElementById(`${`Constraint`}_A_${1}`).value = "A_3_3"
-            document.getElementById(`${`Constraint`}_B_${1}`).value = "-B_3_0"
-          } else if (vehicle_axis == "MR_Yaw" || vehicle_axis == "MR_Vertical") {
-            document.getElementById(`${`Constraint`}_A_${1}`).value = "A_1_1"
-            document.getElementById(`${`Constraint`}_B_${1}`).value = "-B_1_0"
-          }
-        }
-
-        function setBounds(vehicle_axis) {
-          if (vehicle_axis == "MR_Roll" || vehicle_axis == "MR_Pitch") {
-            //Yv or Xu
-            document.getElementById(`${`Bound`}_min_${1}`).value = "-1";
-            document.getElementById(`${`Bound`}_max_${1}`).value = "0";
-            //Ylat or Xlon
-            document.getElementById(`${`Bound`}_min_${2}`).value = "-30";
-            document.getElementById(`${`Bound`}_max_${2}`).value = "30";
-            //Lv or Mu
-            document.getElementById(`${`Bound`}_min_${3}`).value = "-10";
-            document.getElementById(`${`Bound`}_max_${3}`).value = "10";
-            //Llat or Mlon
-            document.getElementById(`${`Bound`}_min_${4}`).value = "50";
-            document.getElementById(`${`Bound`}_max_${4}`).value = "200";
-            //wlag
-            document.getElementById(`${`Bound`}_min_${5}`).value = "-50";
-            document.getElementById(`${`Bound`}_max_${5}`).value = "0";
-            //wlg
-            document.getElementById(`${`Bound`}_min_${6}`).value = "0";
-            document.getElementById(`${`Bound`}_max_${6}`).value = "50";
-          } else if (vehicle_axis == "MR_Yaw") {
-            //Nr
-            document.getElementById(`${`Bound`}_min_${1}`).value = "-1";
-            document.getElementById(`${`Bound`}_max_${1}`).value = "0";
-            //Nped
-            document.getElementById(`${`Bound`}_min_${2}`).value = "0";
-            document.getElementById(`${`Bound`}_max_${2}`).value = "80";
-            //Npedp
-            document.getElementById(`${`Bound`}_min_${3}`).value = "-10";
-            document.getElementById(`${`Bound`}_max_${3}`).value = "10";
-            //wlag
-            document.getElementById(`${`Bound`}_min_${4}`).value = "-50";
-            document.getElementById(`${`Bound`}_max_${4}`).value = "0";
-            //wlg
-            document.getElementById(`${`Bound`}_min_${5}`).value = "0";
-            document.getElementById(`${`Bound`}_max_${5}`).value = "50";
-          } else if (vehicle_axis == "MR_Vertical") {
-            //Zw
-            document.getElementById(`${`Bound`}_min_${1}`).value = "-1";
-            document.getElementById(`${`Bound`}_max_${1}`).value = "0";
-            //Zcoll
-            document.getElementById(`${`Bound`}_min_${2}`).value = "-100";
-            document.getElementById(`${`Bound`}_max_${2}`).value = "100";
-            //wlag
-            document.getElementById(`${`Bound`}_min_${3}`).value = "-50";
-            document.getElementById(`${`Bound`}_max_${3}`).value = "0";
-            //wlg
-            document.getElementById(`${`Bound`}_min_${4}`).value = "0";
-            document.getElementById(`${`Bound`}_max_${4}`).value = "50";
-          }
-        }
-
-        function setMatrixA(vehicle_axis) {
-          if (vehicle_axis == "MR_Roll" || vehicle_axis == "MR_Pitch") {
-            rows = 4;
-            cols = 4;
-            for (let i = 0; i < rows; i++) {
-              for (let j = 0; j < cols; j++) {
-                // Construct the selector for each input field
-                const cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${i}_c${j}]`;
-                const inputElement = document.querySelector(cellSelector);
-                inputElement.value = "0";
-              }
-            }
-          
-            cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${2}_c${1}]`;
-            inputElement = document.querySelector(cellSelector);
-            inputElement.value = "1";
-
-            cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${3}_c${3}]`;
-            inputElement = document.querySelector(cellSelector);
-            inputElement.value = "wlag";
-
-            if (vehicle_axis == "MR_Roll") {
-              cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${0}_c${0}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "Yv";
-
-              cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${0}_c${2}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "9.81";
-
-              cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${0}_c${3}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "Ylat";
-
-              cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${1}_c${0}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "Lv";
-
-              cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${1}_c${3}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "Llat";
-
-            } else if (vehicle_axis == "MR_Pitch") {
-              cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${0}_c${0}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "Xu";
-
-              cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${0}_c${2}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "-9.81";
-
-              cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${0}_c${3}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "Xlon";
-
-              cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${1}_c${0}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "Mu";
-
-              cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${1}_c${3}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "Mlon";
-            }
-          } else if (vehicle_axis == "MR_Yaw" || vehicle_axis == "MR_Vertical") {
-            rows = 2;
-            cols = 2;
-            for (let i = 0; i < rows; i++) {
-              for (let j = 0; j < cols; j++) {
-                // Construct the selector for each input field
-                const cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${i}_c${j}]`;
-                const inputElement = document.querySelector(cellSelector);
-                inputElement.value = "0";
-              }
-            }
-            cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${1}_c${1}]`;
-            inputElement = document.querySelector(cellSelector);
-            inputElement.value = "wlag";
-
-            if (vehicle_axis == "MR_Yaw") {
-              cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${0}_c${0}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "Nr";
-
-              cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${0}_c${1}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "Nped";
-            } else if (vehicle_axis == "MR_Vertical") {
-              cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${0}_c${0}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "Zw";
-
-              cellSelector = `#${'matrixA'} input[name=${'matrixA'}_r${0}_c${1}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "Zcoll";
-            }
-          }
-        }
-
-        function setMatrixB(vehicle_axis) {
-          if (vehicle_axis == "MR_Roll" || vehicle_axis == "MR_Pitch") {
-            rows = 4;
-            cols = 1;
-            for (let i = 0; i < rows; i++) {
-              for (let j = 0; j < cols; j++) {
-                // Construct the selector for each input field
-                const cellSelector = `#${'matrixB'} input[name=${'matrixB'}_r${i}_c${j}]`;
-                const inputElement = document.querySelector(cellSelector);
-                inputElement.value = "0";
-              }
-            }
-            cellSelector = `#${'matrixB'} input[name=${'matrixB'}_r${3}_c${0}]`;
-            inputElement = document.querySelector(cellSelector);
-            inputElement.value = "wlg";
-          } else if (vehicle_axis == "MR_Yaw") {
-            cellSelector = `#${'matrixB'} input[name=${'matrixB'}_r${0}_c${0}]`;
-            inputElement = document.querySelector(cellSelector);
-            inputElement.value = "Npedp";
-            cellSelector = `#${'matrixB'} input[name=${'matrixB'}_r${1}_c${0}]`;
-            inputElement = document.querySelector(cellSelector);
-            inputElement.value = "wlg";
-          } else if (vehicle_axis == "MR_Vertical") {
-            cellSelector = `#${'matrixB'} input[name=${'matrixB'}_r${0}_c${0}]`;
-            inputElement = document.querySelector(cellSelector);
-            inputElement.value = "0";
-            cellSelector = `#${'matrixB'} input[name=${'matrixB'}_r${1}_c${0}]`;
-            inputElement = document.querySelector(cellSelector);
-            inputElement.value = "wlg";
-          }
-        }
-
-        function setH0(vehicle_axis) {
-          if (vehicle_axis == "MR_Roll" || vehicle_axis == "MR_Pitch") {
-            rows = 2;
-            cols = 4;
-            for (let i = 0; i < rows; i++) {
-              for (let j = 0; j < cols; j++) {
-                // Construct the selector for each input field
-                const cellSelector = `#${'H0'} input[name=${'H0'}_r${i}_c${j}]`;
-                const inputElement = document.querySelector(cellSelector);
-                inputElement.value = "0";
-              }
-            }
-            cellSelector = `#${'H0'} input[name=${'H0'}_r${0}_c${1}]`;
-            inputElement = document.querySelector(cellSelector);
-            inputElement.value = "1";
-          } else if (vehicle_axis == "MR_Yaw" || vehicle_axis == "MR_Vertical") {
-            rows = 1;
-            cols = 2;
-            for (let i = 0; i < rows; i++) {
-              for (let j = 0; j < cols; j++) {
-                // Construct the selector for each input field
-                const cellSelector = `#${'H0'} input[name=${'H0'}_r${i}_c${j}]`;
-                const inputElement = document.querySelector(cellSelector);
-                inputElement.value = "0";
-              }
-            }
-            if (vehicle_axis == "MR_Yaw") {
-              cellSelector = `#${'H0'} input[name=${'H0'}_r${0}_c${0}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "1";
-            }
-          }
-        }
-
-        function setH1(vehicle_axis) {
-          if (vehicle_axis == "MR_Roll" || vehicle_axis == "MR_Pitch") {
-            rows = 2;
-            cols = 4;
-            for (let i = 0; i < rows; i++) {
-              for (let j = 0; j < cols; j++) {
-                // Construct the selector for each input field
-                const cellSelector = `#${'H1'} input[name=${'H1'}_r${i}_c${j}]`;
-                const inputElement = document.querySelector(cellSelector);
-                inputElement.value = "0";
-              }
-            }
-            cellSelector = `#${'H1'} input[name=${'H1'}_r${1}_c${0}]`;
-            inputElement = document.querySelector(cellSelector);
-            inputElement.value = "1";
-          } else if (vehicle_axis == "MR_Yaw" || vehicle_axis == "MR_Vertical") {
-            rows = 1;
-            cols = 2;
-            for (let i = 0; i < rows; i++) {
-              for (let j = 0; j < cols; j++) {
-                // Construct the selector for each input field
-                const cellSelector = `#${'H1'} input[name=${'H1'}_r${i}_c${j}]`;
-                const inputElement = document.querySelector(cellSelector);
-                inputElement.value = "0";
-              }
-            }
-            if (vehicle_axis == "MR_Vertical") {
-              cellSelector = `#${'H1'} input[name=${'H1'}_r${0}_c${0}]`;
-              inputElement = document.querySelector(cellSelector);
-              inputElement.value = "1";
-            }
-          }
-        }
-
-        document.getElementById("tf_select").addEventListener("change", function () {
-          if (this.checked) {
-            document.getElementById("tf_form").style.display = "block";
-            document.getElementById("ss_form").style.display = "none";
-            createInputFields('tf_inputFieldsContainer', 'Input', 'input', 1);
-            createInputFields('tf_outputFieldsContainer', 'Output', 'output', 1, true, true);
-
-            // Add select options from log
-            populate_log_message_select()
-
-          } else {
-            document.getElementById("tf_form").style.display = "none";
-          }
+    <div id="plotmag" style="width:1200px;height:800px"></div>
+    <div id="plotphase" style="width:1200px;height:800px"></div>
+
+    <p>Output Console:</p>
+    <textarea id="output" style="width: 1200px; height: 200px;" readonly></textarea>
+
+    <script>
+        // --- DATAFLASH PARSER SIMULATION / HOOK ---
+        var DataflashParser;
+        import('../modules/JsDataflashParser/parser.js').then((mod) => { 
+            DataflashParser = mod.default; 
+            addToOutput("Log Parser Loaded.");
         });
 
-        document.getElementById("ss_select").addEventListener("change", function () {
-          if (this.checked) {
-            createautopopulate('autopopulateContainer');
-            // set presets
-            document.getElementById("ss_form").style.display = "block";
-            document.getElementById("tf_form").style.display = "none";
+        let log = null;
+        const outputBox = document.getElementById("output");
 
-            document.getElementById('createFieldsButton').addEventListener('click', function () {
-              const populate = document.getElementById('populate_dropdown').value
-              console.log("autopopulate selection: ",populate);
+        function addToOutput(msg) {
+            outputBox.value += msg + "\n";
+            outputBox.scrollTop = outputBox.scrollHeight;
+        }
 
-              if (populate != "manual") {
-                setinputValues(populate);
-              }
+        function readFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                log = new DataflashParser();
+                log.processData(reader.result, []);
+                addToOutput("Log Loaded: " + file.name);
+                document.getElementById("parseButton").disabled = false;
+                setupInitialUI();
+            };
+            reader.readAsArrayBuffer(file);
+        }
 
-              const numOutputs = parseInt(document.getElementById('num_Outputs').value, 10);
-              const num_params = parseInt(document.getElementById('num_params').value, 10);
-              const num_constraints = parseInt(document.getElementById('num_cons').value, 10);
-
-              if (populate == "manual" && isNaN(numOutputs) || numOutputs <= 0) {
-                alert('Please enter valid numbers for inputs and outputs.');
-                return;
-              }
-
-              createInputFields('inputFieldsContainer', 'Input', 'input', 1);
-              createInputFields('outputFieldsContainer', 'Output', 'output', numOutputs, true, true);
-
-              // Add select options from log
-              populate_log_message_select()
-
-              createsymbolicfields('symbolicparams',' Param',num_params);
-              createBoundsField('boundsContainer',' Bound',num_params);
-              createConstraintsField('constraintsinput', 'Constraint',num_constraints)
-
-              if (populate != "manual") {
-                setParamValues(populate);
-                setConstraintList(populate);
-                setInputFields(populate);
-                setOutputFields(populate);
-              }
-
-              const orderA = parseInt(document.getElementById('A_order').value, 10);
-
-              if (isNaN(orderA) || orderA < 1) {
-                alert('Please enter valid numbers for inputs and outputs.');
-                return;
-              }
-
-              createMatrixTable('matrixA', orderA, orderA, 'Matrix A');
-              createMatrixTable('matrixB', orderA, 1, 'Matrix B');
-              createMatrixTable('H0',numOutputs, orderA, 'H0');
-              createMatrixTable('H1',numOutputs, orderA, 'H1');
-
-              if (populate != "manual") {
-                setMatrixA(populate);
-                setMatrixB(populate);
-                setH0(populate);
-                setH1(populate);
-                setBounds(populate);
-              }
+        function setupInitialUI() {
+            // Populate Input/Output Selects
+            const types = Object.keys(log.messageTypes).sort();
+            const containers = ['tf_inputFieldsContainer', 'tf_outputFieldsContainer'];
+            
+            containers.forEach(id => {
+                const div = document.getElementById(id);
+                div.innerHTML = (id.includes('input') ? 'Input: ' : 'Output: ');
+                const selMsg = document.createElement('select');
+                const selField = document.createElement('select');
+                
+                selMsg.innerHTML = '<option>None</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
+                selMsg.onchange = () => {
+                    const fields = log.messageTypes[selMsg.value]?.expressions || [];
+                    selField.innerHTML = fields.map(f => `<option value="${f}">${f}</option>`).join('');
+                };
+                
+                div.appendChild(selMsg);
+                div.appendChild(selField);
+                
+                // Set Defaults
+                if(id.includes('input')) { selMsg.value = 'RATE'; selMsg.onchange(); selField.value = 'ROut'; }
+                else { selMsg.value = 'RATE'; selMsg.onchange(); selField.value = 'R'; }
             });
-          } else {
-            document.getElementById("ss_form").style.display = "none";
-          }
-        });
+        }
 
-        document.getElementById('parseButton').addEventListener('click', async () => {
+        // --- CORE MATH FUNCTIONS (Native JS) ---
 
-          const tfCheckbox = document.getElementById('tf_select').checked
-          const ssCheckbox = document.getElementById('ss_select').checked
+        function applyFilter(data, dt, cutoffRad) {
+            const fs = 1 / dt;
+            const fc = cutoffRad / (2 * Math.PI); // Convert rad/s to Hz
+            
+            // 1. Check if the cutoff frequency is valid (Nyquist limit)
+            if (fc >= fs / 2) {
+                console.error("LPF Cutoff is too high for the data sample rate. Reducing cutoff.");
+                return data; // Return unfiltered data to avoid crash
+            }
 
-          if(tfCheckbox) {
-            run_transfer_function_ID(log)
+            // 2. Create the calculator
+            const iirCalculator = new Fili.CalcCascades();
+            
+            // 3. FIX: Call .lowpass() and specify 'butterworth' as the characteristic
+            const coeffs = iirCalculator.lowpass({
+                order: 4,
+                characteristic: 'butterworth',
+                Fs: fs,
+                Fc: fc
+            });
+            
+            // 4. Create and apply the filter
+            const filter = new Fili.IirFilter(coeffs);
+            return filter.filtfilt(data);
+        }
+        
+        function computeFFT(signal) {
+            // Simple power-of-two padding
+            const n = signal.length;
+            const nextPow2 = Math.pow(2, Math.ceil(Math.log2(n)));
+            const padded = new Array(nextPow2).fill(0);
+            for(let i=0; i<n; i++) padded[i] = signal[i];
+            
+            // Use Math.js FFT
+            return math.fft(padded);
+        }
 
-          } else if (ssCheckbox) {
-            run_SS_ID(log)
+        // A robust iterative FFT (Radix-2) to replace math.fft
+        function iterativeFFT(real) {
+            const N = real.length;
+            if ((N & (N - 1)) !== 0) throw new Error("FFT length must be a power of 2");
 
-          }
-        })
-      }
+            const outReal = new Float64Array(real);
+            const outImag = new Float64Array(N);
 
-      main().catch((error) => {
-        console.error(error);
-        const output = document.getElementById("output");
-        output.value += '\nError during execution:\n' + error;
-      });
+            // Bit-reversal permutation
+            for (let i = 1, j = 0; i < N; i++) {
+                let bit = N >> 1;
+                for (; j & bit; bit >>= 1) j ^= bit;
+                j ^= bit;
+                if (i < j) {
+                    [outReal[i], outReal[j]] = [outReal[j], outReal[i]];
+                }
+            }
 
-      function addToOutput(message) {
-        const output = document.getElementById("output");
-        output.value += message + "\n";
-      }
+            // Iterative butterflies
+            for (let len = 2; len <= N; len <<= 1) {
+                let ang = 2 * Math.PI / len;
+                let wlenReal = Math.cos(ang);
+                let wlenImag = -Math.sin(ang);
+                for (let i = 0; i < N; i += len) {
+                    let wReal = 1;
+                    let wImag = 0;
+                    for (let j = 0; j < len / 2; j++) {
+                        let uReal = outReal[i + j];
+                        let uImag = outImag[i + j];
+                        let vReal = outReal[i + j + len / 2] * wReal - outImag[i + j + len / 2] * wImag;
+                        let vImag = outReal[i + j + len / 2] * wImag + outImag[i + j + len / 2] * wReal;
+                        outReal[i + j] = uReal + vReal;
+                        outImag[i + j] = uImag + vImag;
+                        outReal[i + j + len / 2] = uReal - vReal;
+                        outImag[i + j + len / 2] = uImag - vImag;
+                        let tmpReal = wReal * wlenReal - wImag * wlenImag;
+                        wImag = wReal * wlenImag + wImag * wlenReal;
+                        wReal = tmpReal;
+                    }
+                }
+            }
+
+            // Convert to Math.js complex format for compatibility with the rest of your code
+            const results = [];
+            for (let i = 0; i < N; i++) {
+                results.push(math.complex(outReal[i], outImag[i]));
+            }
+            return results;
+        }
+
+        var last_window_size
+        function window_size_inc(event) {
+            if (last_window_size == null) {
+                last_window_size = parseFloat(event.target.defaultValue)
+            }
+            const new_value = parseFloat(event.target.value)
+            const change = parseFloat(event.target.value) - last_window_size
+            if (Math.abs(change) != 1) {
+                // Assume a change of one is comming from the up down buttons, ignore angthing else
+                last_window_size = new_value
+                return
+            }
+            var new_exponent = Math.log2(last_window_size)
+            if (!Number.isInteger(new_exponent)) {
+                // Move to power of two in the selected direction
+                new_exponent = Math.floor(new_exponent)
+                if (change > 0) {
+                    new_exponent += 1
+                }
+
+            } else if (change > 0) {
+                // Move up one
+                new_exponent += 1
+
+            } else {
+                // Move down one
+                new_exponent -= 1
+
+            }
+            event.target.value = 2**new_exponent
+            last_window_size = event.target.value
+        }
+
+async function runIdentification() {
+            addToOutput("Starting Analysis (Averaged FFT segments)...");
+            
+            const tStart = parseFloat(document.getElementById('starttime').value);
+            const tEnd = parseFloat(document.getElementById('endtime').value);
+            const fStart = parseFloat(document.getElementById('startfreq').value);
+            const fEnd = parseFloat(document.getElementById('endfreq').value);
+            const fCutoff = parseFloat(document.getElementById('cutofffreq').value);
+            const windowSize = parseInt(document.getElementById('FFTWindow_size').value);
+
+            // 1. Get and Pre-process Data
+            const inMsg = document.getElementById('tf_inputFieldsContainer').querySelectorAll('select')[0].value;
+            const inFld = document.getElementById('tf_inputFieldsContainer').querySelectorAll('select')[1].value;
+            const outMsg = document.getElementById('tf_outputFieldsContainer').querySelectorAll('select')[0].value;
+            const outFld = document.getElementById('tf_outputFieldsContainer').querySelectorAll('select')[1].value;
+
+            if (inMsg === "None" || outMsg === "None") {
+                addToOutput("Error: Please select input and output fields.");
+                return;
+            }
+
+            let time = Array.from(log.get(inMsg, "TimeUS")).map(t => t / 1000000);
+            let u_raw = Array.from(log.get(inMsg, inFld));
+
+            const idxStart = time.findIndex(t => t >= tStart);
+            const idxEnd = time.findIndex(t => t >= tEnd);
+            if (idxStart === -1 || idxEnd === -1) { addToOutput("Error: Invalid time range."); return; }
+            
+            const dt = (time[idxEnd-1] - time[idxStart]) / (idxEnd - idxStart);
+            const u_sliced = u_raw.slice(idxStart, idxEnd);
+            addToOutput(`Sample rate: ${(1/dt).toFixed(1)} Hz. Data points: ${u_sliced.length}`);
+
+            let out_time = Array.from(log.get(outMsg, "TimeUS")).map(t => t / 1000000);
+            let y_raw = Array.from(log.get(outMsg, outFld));
+            const outStart = out_time.findIndex(t => t >= tStart);
+            const outEnd = out_time.findIndex(t => t >= tEnd);
+            const y_sliced = y_raw.slice(outStart, outEnd);
+
+            // Scaling output to radians
+            const y_rad = y_sliced.map(val => val * (Math.PI / 180)); 
+
+            // Apply LPF to both signals
+            const u_filt = applyFilter(u_sliced, dt, fCutoff);
+            const y_filt = applyFilter(y_rad, dt, fCutoff);
+
+            // --- 2. Averaged Frequency Response Estimation (Welch's Method) ---
+            const step = Math.floor(windowSize / 2); // 50% overlap
+            let segmentCount = 0;
+
+            const S_uu = new Array(windowSize / 2).fill(0).map(() => math.complex(0, 0));
+            const S_uy = new Array(windowSize / 2).fill(0).map(() => math.complex(0, 0));
+
+            const hanning = new Float64Array(windowSize);
+            for (let i = 0; i < windowSize; i++) {
+                hanning[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (windowSize - 1)));
+            }
+
+            for (let offset = 0; offset + windowSize <= u_filt.length; offset += step) {
+                const u_seg = u_filt.slice(offset, offset + windowSize);
+                const y_seg = y_filt.slice(offset, offset + windowSize);
+
+                const u_win = u_seg.map((v, i) => v * hanning[i]);
+                const y_win = y_seg.map((v, i) => v * hanning[i]);
+
+                const U = iterativeFFT(u_win);
+                const Y = iterativeFFT(y_win);
+
+                for (let k = 0; k < windowSize / 2; k++) {
+                    const U_conj = math.conj(U[k]);
+                    S_uu[k] = math.add(S_uu[k], math.multiply(U[k], U_conj));
+                    S_uy[k] = math.add(S_uy[k], math.multiply(Y[k], U_conj));
+                }
+                segmentCount++;
+            }
+
+            if (segmentCount === 0) {
+                addToOutput("Error: Data range too short for selected Window Size.");
+                return;
+            }
+
+            const freqs = [];
+            const H_mag = [];
+            const H_phase = [];
+            const complexH = []; // This will store our target complex points
+
+            for (let k = 0; k < windowSize / 2; k++) {
+                const f = (k * (1/dt)) / windowSize * 2 * Math.PI; 
+                if (f < fStart || f > fEnd) continue;
+
+                const valH = math.divide(S_uy[k], S_uu[k]);
+                freqs.push(f);
+                complexH.push(valH); // FIX: Add data to complexH
+
+                H_mag.push(20 * Math.log10(math.abs(valH)));
+                H_phase.push(math.atan2(valH.im, valH.re) * 180 / Math.PI);
+            }
+
+            // --- 3. Fitting ---
+            const symStr = document.getElementById('tf_params').value.split(',').map(s => s.trim()).filter(s => s !== "");
+            const numExpr = document.getElementById('customNumerator').value;
+            const denExpr = document.getElementById('customDenominator').value;
+            const tauIndex = symStr.indexOf('tau');
+
+            let compiledNum, compiledDen;
+            try {
+                compiledNum = math.compile(numExpr);
+                compiledDen = math.compile(denExpr);
+            } catch (e) {
+                addToOutput("Math Syntax Error: " + e.message);
+                return;
+            }
+
+            // The model returns WEIGHTED Real/Imag parts based on target magnitude
+            const complexModel = (params) => (idx) => {
+                const freqIdx = Math.floor(idx / 2);
+                const isImaginary = idx % 2 === 1;
+                const w = freqs[freqIdx];
+                const targetMag = math.abs(complexH[freqIdx]); // complexH is now defined
+
+                const scope = { s: math.complex(0, w) };
+                for (let i = 0; i < symStr.length; i++) scope[symStr[i]] = params[i];
+
+                try {
+                    let res = math.divide(compiledNum.evaluate(scope), compiledDen.evaluate(scope));
+                    if (tauIndex !== -1) {
+                        const delayTerm = math.exp(math.multiply(math.complex(0, -params[tauIndex]), w));
+                        res = math.multiply(res, delayTerm);
+                    }
+                    
+                    // Normalize by target magnitude to prioritize relative error
+                    const weightedRes = math.divide(res, targetMag || 1e-6);
+                    return isImaginary ? weightedRes.im : weightedRes.re;
+                } catch (e) { return 0; }
+            };
+
+            // Build weighted target data: [Re/mag, Im/mag, ...]
+            const weightedTargetData = [];
+            complexH.forEach(h => {
+                const mag = math.abs(h) || 1e-6;
+                weightedTargetData.push(h.re / mag);
+                weightedTargetData.push(h.im / mag);
+            });
+
+            // Improved Initial Guess Logic
+            const firstMag = math.abs(complexH[0]); 
+            const initialValues = symStr.map(s => {
+                if (s === 'a') return 3599;     // Standard gain symbol
+                if (s === 'b') return 0.0;     // Standard gain symbol
+                if (s === 'c') return 1.0;     // Standard gain symbol
+                if (s === 'd') return 32;     // Standard gain symbol
+                if (s === 'e') return 199.4;     // Standard gain symbol
+                if (s === 'f') return 654;     // Standard gain symbol
+                if (s === 'g') return 1091;     // Standard gain symbol
+                if (s === 'tau') return 0.001;      // 30ms typical delay
+                return 1.0;
+            });
+            
+            const options = { 
+                initialValues: initialValues,
+                minValues: symStr.map(() => 0),     // Force positive
+                damping: 0.5,
+                maxIterations: 200,
+                errorTolerance: 1e-6, 
+                gradientDifference: 1e-5
+            };
+
+            addToOutput("Starting Complex Optimizer...");
+            const xIndices = Array.from({length: weightedTargetData.length}, (_, i) => i);
+            const dataToFit = { x: xIndices, y: weightedTargetData };
+
+            try {
+                const fitResult = ML.levenbergMarquardt(dataToFit, complexModel, options);
+                
+                // Calculate Goodness of Fit measures
+                const totalSquaredError = fitResult.parameterError; // Sum of squared residuals
+                const numDataPoints = dataToFit.y.length;   // freqs.length * 2 (Real and Imaginary)
+                const mse = totalSquaredError / numDataPoints;
+                const rmse = Math.sqrt(mse);
+
+                addToOutput("--- Fit Quality ---");
+                // totalSquaredError is the 'Cost'
+                addToOutput(`Total Cost (J): ${totalSquaredError.toFixed(4)}`);
+                // RMSE gives the average error magnitude per point
+                addToOutput(`Average Error (RMSE): ${(rmse * 100).toFixed(2)}%`);
+
+                addToOutput("--- Fit Result ---");
+                symStr.forEach((s, i) => {
+                    addToOutput(`${s}: ${fitResult.parameterValues[i].toFixed(6)}`);
+                });
+
+                // Generate Fit Curves for Plotting
+                const fit_mag = [];
+                const fit_phase = [];
+                const finalParams = fitResult.parameterValues;
+
+                freqs.forEach(w => {
+                    const scope = { s: math.complex(0, w) };
+                    for (let i = 0; i < symStr.length; i++) scope[symStr[i]] = finalParams[i];
+                    
+                    let res = math.divide(compiledNum.evaluate(scope), compiledDen.evaluate(scope));
+                    if (tauIndex !== -1) {
+                        const delayTerm = math.exp(math.multiply(math.complex(0, -finalParams[tauIndex]), w));
+                        res = math.multiply(res, delayTerm);
+                    }
+
+                    fit_mag.push(20 * Math.log10(math.abs(res)));
+                    fit_phase.push(math.atan2(res.im, res.re) * 180 / Math.PI);
+                });
+
+                // 5. Plotting
+                const tracesmag = [
+                    { x: freqs, y: H_mag, name: 'Log Data (Avg)', type: 'scatter', mode: 'markers', marker: {size: 4, opacity: 0.6} },
+                    { x: freqs, y: fit_mag, name: 'Fit', type: 'scatter', mode: 'lines', line: {color: 'red'} },
+                ];
+                const tracesphase = [
+                    { x: freqs, y: H_phase, name: 'Log Data (Avg)', type: 'scatter', mode: 'markers', marker: {size: 4, opacity: 0.6} },
+                    { x: freqs, y: fit_phase, name: 'Fit', type: 'scatter', mode: 'lines', line: {color: 'red'} }
+                ];
+
+                Plotly.newPlot('plotmag', tracesmag, { title: 'Magnitude (dB)', xaxis: {type: 'log', title: 'rad/s'}, yaxis: {title: 'dB'} });
+                Plotly.newPlot('plotphase', tracesphase, { title: 'Phase (deg)', xaxis: {type: 'log', title: 'rad/s'}, yaxis: {title: 'deg'} });
+
+            } catch (err) {
+                addToOutput("Optimizer failed: " + err);
+                console.error(err);
+            }
+        }
     </script>
-  </body>
+</body>
 </html>
