@@ -873,8 +873,8 @@ function calculate_predicted_TF(H_acft, sample_rate, window_size) {
     var H_PID_Acft_plus_one = [new Array(PID_H_TOT[0].length).fill(0), new Array(PID_H_TOT[0].length).fill(0)]
 
     const PID_Acft = complex_mul(H_acft, PID_H_TOT)
-    const INS_PID_Acft = complex_mul(PID_Acft, INS_H.H_total)
-
+//    const INS_PID_Acft = complex_mul(PID_Acft, INS_H.H_total)
+    const INS_PID_Acft = PID_Acft
     const FFPID_Acft = complex_mul(H_acft, FFPID_H)
     const FLTT_FFPID_Acft = complex_mul(FFPID_Acft, TGT_FILT_H)
 
@@ -1577,9 +1577,9 @@ function load_time_history_data(t_start, t_end, axis) {
         ind2_a = nearestIndex(timeATT, t_end*1000000)
     }
 
-    const timeSIDD = log.get("SIDD", "TimeUS")
-    const ind1_s = nearestIndex(timeSIDD, t_start*1000000)
-    const ind2_s = nearestIndex(timeSIDD, t_end*1000000)
+//    const timeSIDD = log.get("SIDD", "TimeUS")
+//    const ind1_s = nearestIndex(timeSIDD, t_start*1000000)
+//    const ind2_s = nearestIndex(timeSIDD, t_end*1000000)
 
     var ActInputParam = ""
     var RateTgtParam = ""
@@ -1621,7 +1621,7 @@ function load_time_history_data(t_start, t_end, axis) {
         AttTgtData = Array.from(log.get("ATT", AttTgtParam))
         AttData = Array.from(log.get("ATT", AttParam))
     }
-    let GyroRawData = Array.from(log.get("SIDD", GyroRawParam))
+    let GyroRawData = Array.from(log.get("RATE", RateParam))
 
     // Slice ActInputData
     ActInputData = ActInputData.slice(ind1_i, ind2_i)
@@ -1642,11 +1642,11 @@ function load_time_history_data(t_start, t_end, axis) {
 
 
     // Slice GyroRawData and Convert data from degrees/second to radians/second
-    GyroRawData = GyroRawData.slice(ind1_s, ind2_s)
+    GyroRawData = GyroRawData.slice(ind1_i, ind2_i)
     GyroRawData = array_scale(GyroRawData, 0.01745)
     // Pull and Slice PilotInputData
-    let PilotInputData = Array.from(log.get("SIDD", "Targ"))
-    PilotInputData = PilotInputData.slice(ind1_s, ind2_s)
+    let PilotInputData = Array.from(log.get("RATE", RateTgtParam))
+    PilotInputData = PilotInputData.slice(ind1_i, ind2_i)
     PilotInputData = array_scale(PilotInputData, 0.01745)
 
     // Pull Targ for input to Attitude Disturbance Rejection Transfer Function
@@ -2042,9 +2042,10 @@ function redraw_freq_resp() {
     } else if (document.getElementById("type_Att_Ctrlr").checked) {
         calc_data = calc_freq_resp.attctrl_H
         calc_data_coh = calc_freq_resp.attctrl_coh
-        if (sid_axis > 3 && sid_axis < 7 || sid_axis > 9) {
-            show_set_calc = false
-        }
+//        if (sid_axis > 3 && sid_axis < 7 || sid_axis > 9) {
+//            show_set_calc = false
+//        }
+        show_set_calc = true
         pred_data = pred_freq_resp.attctrl_ff_H  // attitude controller with feedforward
         pred_data_coh = calc_freq_resp.bareAC_coh
         show_set_pred = true
